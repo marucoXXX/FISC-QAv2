@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.excel_io import read_questionnaire
 from src.indexer import run_indexer
-from src.router import routing_to_dict, run_router
+from src.router import (
+    _build_llm_routing_prompt,
+    _parse_llm_routing_response,
+    routing_to_dict,
+    run_router,
+)
 
 
 class TestRouter:
@@ -62,3 +69,116 @@ class TestRouter:
         result = run_router(questions, index, token_budget_per_reader=budget)
         # 小さい予算なので複数Readerに分割されるはず
         assert len(result.readers) > 1
+
+
+class TestLlmRouter:
+    """LLM ベース動的ルーティングの検証（mock）。"""
+
+    def test_build_llm_routing_prompt(self, questionnaire_path: Path, kb_dir: Path):
+        """LLM ルーティングプロンプトが正しく構築されること。"""
+        questions = read_questionnaire(questionnaire_path)
+        index = run_indexer(kb_dir)
+        prompt = _build_llm_routing_prompt(questions, index)
+        assert "KBファイル一覧" in prompt
+        assert "質問リスト" in prompt
+        assert "Q1" in prompt
+        assert "security_policy.pdf" in prompt
+
+    def test_parse_llm_routing_response(self, kb_dir: Path):
+        """LLM レスポンスの JSON を正しくパースすること。"""
+        from src.models import Question
+        questions = [
+            Question(no=1, major="セキュリティ管理", minor="ポリシー管理", question="テスト"),
+            Question(no=2, major="アクセス管理", minor="権限管理", question="テスト"),
+        ]
+        index = run_indexer(kb_dir)
+        response_text = json.dumps({
+            "routing": [
+                {"question_no": 1, "files": ["security_policy.pdf", "access_control_policy.pdf"]},
+                {"question_no": 2, "files": ["access_control_policy.pdf"]},
+            ]
+        })
+        result = _parse_llm_routing_response(response_text, questions, index)
+        assert result[1] == ["security_policy.pdf", "access_control_policy.pdf"]
+        assert result[2] == ["access_control_policy.pdf"]
+
+    def test_parse_llm_routing_response_markdown(self, kb_dir: Path):
+        """マークダウンコードブロックで囲まれた JSON もパースできること。"""
+        from src.models import Question
+        questions = [Question(no=1, major="テスト", minor="テスト", question="テスト")]
+        index = run_indexer(kb_dir)
+        response_text = '```json\n{"routing": [{"question_no": 1, "files": ["security_policy.pdf"]}]}\n```'
+        result = _parse_llm_routing_response(response_text, questions, index)
+        assert result[1] == ["security_policy.pdf"]
+
+    def test_parse_llm_routing_filters_invalid_files(self, kb_dir: Path):
+        """存在しないファイル名が除外されること。"""
+        from src.models import Question
+        questions = [Question(no=1, major="テスト", minor="テスト", question="テスト")]
+        index = run_indexer(kb_dir)
+        response_text = json.dumps({
+            "routing": [
+                {"question_no": 1, "files": ["security_policy.pdf", "nonexistent.pdf"]},
+            ]
+        })
+        result = _parse_llm_routing_response(response_text, questions, index)
+        assert result[1] == ["security_policy.pdf"]
+
+    def test_run_router_with_llm(self, questionnaire_path: Path, kb_dir: Path):
+        """LLM ルーティングが正しく動作すること（mock）。"""
+        questions = read_questionnaire(questionnaire_path)
+        index = run_indexer(kb_dir)
+
+        # 全質問に security_policy.pdf を割り当てるLLMレスポンス
+        routing_data = {
+            "routing": [
+                {"question_no": q.no, "files": ["security_policy.pdf"]}
+                for q in questions
+            ]
+        }
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock(text=json.dumps(routing_data))]
+        with patch("anthropic.Anthropic") as mock_cls:
+            mock_client = mock_cls.return_value
+            mock_client.messages.create.return_value = mock_response
+            result = run_router(questions, index, api_key="fake-key")
+
+        result_dict = routing_to_dict(result)
+        all_assigned = set()
+        for reader in result_dict["readers"]:
+            all_assigned.update(reader["questions"])
+        assert all_assigned == {q.no for q in questions}
+        mock_client.messages.create.assert_called_once()
+
+    def test_run_router_llm_failure_fallback(self, questionnaire_path: Path, kb_dir: Path):
+        """LLM 失敗時に静的ルーティングにフォールバックすること。"""
+        questions = read_questionnaire(questionnaire_path)
+        index = run_indexer(kb_dir)
+
+        with patch("anthropic.Anthropic") as mock_cls:
+            mock_client = mock_cls.return_value
+            mock_client.messages.create.side_effect = Exception("API error")
+            result = run_router(questions, index, api_key="fake-key")
+
+        # フォールバック: 全質問が割り当てられていること
+        result_dict = routing_to_dict(result)
+        all_assigned = set()
+        for reader in result_dict["readers"]:
+            all_assigned.update(reader["questions"])
+        assert all_assigned == {q.no for q in questions}
+
+    def test_run_router_no_api_key_uses_static(self, questionnaire_path: Path, kb_dir: Path):
+        """api_key なしの場合は静的ルーティングが使われること。"""
+        questions = read_questionnaire(questionnaire_path)
+        index = run_indexer(kb_dir)
+
+        # api_key なしで呼び出し — LLM は呼ばれないはず
+        with patch("anthropic.Anthropic") as mock_cls:
+            result = run_router(questions, index)
+            mock_cls.assert_not_called()
+
+        result_dict = routing_to_dict(result)
+        all_assigned = set()
+        for reader in result_dict["readers"]:
+            all_assigned.update(reader["questions"])
+        assert all_assigned == {q.no for q in questions}

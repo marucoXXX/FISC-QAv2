@@ -47,8 +47,19 @@ def _load_past_answers(kb_dir: Path) -> dict[str, dict]:
     return past
 
 
-def _find_related_files(question: Question, index_dicts: list[dict]) -> list[str]:
-    """質問に関連するKBファイルのパスリストを返す（ルーティングマップから推定）。"""
+def _find_related_files(
+    question: Question,
+    index_dicts: list[dict],
+    routing_map: dict[int, list[str]] | None = None,
+) -> list[str]:
+    """質問に関連するKBファイル名リストを返す。
+
+    routing_map が渡された場合は Router の出力を使い、
+    なければ従来の静的キーワードマッチにフォールバックする。
+    """
+    if routing_map and question.no in routing_map:
+        return routing_map[question.no]
+
     from .router import _KEYWORD_MAP
     keywords = _KEYWORD_MAP.get(question.major, [])
     related = []
@@ -159,13 +170,31 @@ def run_pipeline(
         f"（更新あり: {len(updated_files)}ファイル）"
     )
 
-    # [3] 過去回答再利用判断
+    # [3] 過去回答の事前ルーティング（LLM利用可能なら動的ルーティングで関連ファイルを特定）
+    pre_routing = run_router(
+        questions, index_entries, config.token_budget_per_reader,
+        api_key=config.api_key, model=config.model,
+    )
+    # ルーティング結果から質問→ファイル名マップを構築
+    routing_map: dict[int, list[str]] = {}
+    for reader in pre_routing.readers:
+        for qno in reader.questions:
+            file_names = [
+                entry.file_name for entry in index_entries
+                if str(entry.path) in reader.files or entry.path in reader.files
+            ]
+            if qno not in routing_map:
+                routing_map[qno] = []
+            for fn in file_names:
+                if fn not in routing_map[qno]:
+                    routing_map[qno].append(fn)
+
     past_answers = _load_past_answers(kb_dir)
     reused: dict[int, Answer] = {}
     new_questions: list[Question] = []
 
     for q in questions:
-        related_files = _find_related_files(q, index_dicts)
+        related_files = _find_related_files(q, index_dicts, routing_map)
         all_unchanged = all(
             not entry.updated
             for entry in index_entries
@@ -187,11 +216,14 @@ def run_pipeline(
 
     _log(f"      → 過去回答採用: {len(reused)}問 / 新規回答: {len(new_questions)}問")
 
-    # [3/5] ルーティング
+    # [3/5] ルーティング（新規質問のみ再ルーティング）
     all_answers: dict[int, Answer] = dict(reused)
 
     if new_questions:
-        routing = run_router(new_questions, index_entries, config.token_budget_per_reader)
+        routing = run_router(
+            new_questions, index_entries, config.token_budget_per_reader,
+            api_key=config.api_key, model=config.model,
+        )
         _log(f"[3/5] ルーティング完了: Reader {len(routing.readers)}台に分配")
 
         # [4/5] Reader 並列実行（Fan-out → Fan-in）

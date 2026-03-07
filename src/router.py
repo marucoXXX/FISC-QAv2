@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import logging
+
 from .models import IndexEntry, Question, ReaderAssignment, RoutingResult
+
+logger = logging.getLogger(__name__)
 
 # 大分類→KBカテゴリ+キーワードの静的マッピング
 _CATEGORY_HINTS: dict[str, list[str]] = {
@@ -52,6 +57,115 @@ def _match_files_for_question(
     return matched
 
 
+def _static_route(
+    questions: list[Question],
+    index: list[IndexEntry],
+) -> list[tuple[Question, list[IndexEntry]]]:
+    """静的キーワードマッチによるルーティング。"""
+    return [(q, _match_files_for_question(q, index)) for q in questions]
+
+
+def _build_llm_routing_prompt(
+    questions: list[Question],
+    index: list[IndexEntry],
+) -> str:
+    """LLM ルーティング用のプロンプトを生成する。"""
+    index_desc = "\n".join(
+        f"- {e.file_name} (category: {e.category}, tokens: {e.estimated_tokens}): {e.summary[:200]}"
+        for e in index
+    )
+    question_desc = "\n".join(
+        f"- Q{q.no} [{q.major} > {q.minor}]: {q.question}"
+        for q in questions
+    )
+    return (
+        "あなたはFISC安全対策基準に関する質問票の回答支援システムのルーティングエージェントです。\n"
+        "以下のナレッジベース（KB）ファイル一覧と質問リストを見て、"
+        "各質問に回答するために参照すべきKBファイルを選んでください。\n\n"
+        "## KBファイル一覧\n"
+        f"{index_desc}\n\n"
+        "## 質問リスト\n"
+        f"{question_desc}\n\n"
+        "## 出力形式\n"
+        "以下のJSON形式で出力してください。他のテキストは不要です。\n"
+        "```json\n"
+        "{\n"
+        '  "routing": [\n'
+        '    {"question_no": 1, "files": ["file1.pdf", "file2.docx"]},\n'
+        "    ...\n"
+        "  ]\n"
+        "}\n"
+        "```\n"
+        "各質問に最低1つ、最大3つのファイルを割り当ててください。\n"
+        "質問文の内容を理解し、最も関連性の高いファイルを選んでください。"
+    )
+
+
+def _parse_llm_routing_response(
+    text: str,
+    questions: list[Question],
+    index: list[IndexEntry],
+) -> dict[int, list[str]]:
+    """LLM レスポンスから質問→ファイル名リストのマッピングを解析する。"""
+    # JSON 部分を抽出
+    clean = text
+    if "```" in clean:
+        parts = clean.split("```")
+        for part in parts:
+            stripped = part.strip()
+            if stripped.startswith("json"):
+                stripped = stripped[4:].strip()
+            if stripped.startswith("{"):
+                clean = stripped
+                break
+
+    data = json.loads(clean)
+    routing_list = data.get("routing", [])
+
+    valid_files = {e.file_name for e in index}
+    result: dict[int, list[str]] = {}
+    for item in routing_list:
+        qno = item["question_no"]
+        files = [f for f in item["files"] if f in valid_files]
+        if files:
+            result[qno] = files
+
+    return result
+
+
+def _llm_route(
+    questions: list[Question],
+    index: list[IndexEntry],
+    api_key: str,
+    model: str,
+) -> list[tuple[Question, list[IndexEntry]]]:
+    """LLM ベースの動的ルーティング。"""
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+    prompt = _build_llm_routing_prompt(questions, index)
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=2048,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    response_text = response.content[0].text
+
+    qno_to_files = _parse_llm_routing_response(response_text, questions, index)
+    index_by_name = {e.file_name: e for e in index}
+
+    result: list[tuple[Question, list[IndexEntry]]] = []
+    for q in questions:
+        file_names = qno_to_files.get(q.no, [])
+        matched = [index_by_name[f] for f in file_names if f in index_by_name]
+        if not matched:
+            # LLM が割り当てなかった質問は静的フォールバック
+            matched = _match_files_for_question(q, index)
+        result.append((q, matched))
+
+    return result
+
+
 def _pack_readers(
     question_files: list[tuple[Question, list[IndexEntry]]],
     token_budget: int,
@@ -97,11 +211,17 @@ def run_router(
     questions: list[Question],
     index: list[IndexEntry],
     token_budget_per_reader: int = 80000,
+    api_key: str | None = None,
+    model: str = "claude-sonnet-4-20250514",
 ) -> RoutingResult:
-    question_files: list[tuple[Question, list[IndexEntry]]] = []
-    for q in questions:
-        matched = _match_files_for_question(q, index)
-        question_files.append((q, matched))
+    if api_key:
+        try:
+            question_files = _llm_route(questions, index, api_key, model)
+        except Exception as e:
+            logger.warning("LLM routing failed, falling back to static: %s", e)
+            question_files = _static_route(questions, index)
+    else:
+        question_files = _static_route(questions, index)
 
     readers = _pack_readers(question_files, token_budget_per_reader)
     return RoutingResult(readers=readers)
