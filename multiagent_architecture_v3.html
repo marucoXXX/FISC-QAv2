@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FISC Multi-Agent Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f8f9fa;
+    --border: #d0d7de;
+    --text: #1a1a2e;
+    --muted: #6e7781;
+    --blue:    #0078d4;
+    --blue-l:  #deecf9;
+    --green:   #107c10;
+    --green-l: #dff6dd;
+    --purple:  #5c2d91;
+    --purple-l:#f4eeff;
+    --amber:   #d83b01;
+    --amber-l: #fff4e5;
+    --gray-l:  #f3f3f3;
+    --red:     #a4262c;
+    --red-l:   #fde7e9;
+    --teal:    #008272;
+    --teal-l:  #e0f2f1;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', 'Segoe UI', sans-serif;
+    padding: 40px 48px 64px;
+    font-size: 14px;
+  }
+
+  /* ── Header ── */
+  .page-header {
+    border-bottom: 2px solid var(--blue);
+    padding-bottom: 14px;
+    margin-bottom: 36px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .page-header h1 {
+    font-size: 22px; font-weight: 700;
+    color: var(--blue); letter-spacing: .01em;
+  }
+  .page-header p { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .page-meta { font-size: 11px; color: var(--muted); text-align: right; line-height: 1.8; }
+
+  /* ── Section title ── */
+  .section-title {
+    font-size: 13px; font-weight: 600;
+    color: var(--muted); letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ════════════════════════════
+     SEQUENTIAL PATTERN (全体)
+  ═══════════════════════════════ */
+  .seq-label {
+    font-size: 11px; font-weight: 600;
+    color: var(--blue); letter-spacing: .12em;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 14px;
+  }
+  .seq-label .badge {
+    background: var(--blue); color: #fff;
+    font-size: 10px; padding: 1px 8px; border-radius: 2px;
+  }
+  .seq-label::after { content:''; flex:1; height:1px; background:var(--blue); opacity:.3; }
+
+  /* ── IO box (Input/Output) ── */
+  .io-box {
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 16px;
+    background: var(--gray-l);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .io-box .io-icon { font-size: 20px; flex-shrink: 0; }
+  .io-box .io-label { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+  .io-box .io-name  { font-size: 14px; font-weight: 700; color: var(--text); margin-top: 1px; }
+  .io-box .io-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Down arrow ── */
+  .arrow-v {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 6px 0;
+    position: relative;
+  }
+  .arrow-v .av-line {
+    width: 2px; height: 24px;
+    background: var(--border);
+  }
+  .arrow-v .av-head {
+    width: 0; height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 9px solid var(--border);
+  }
+  .arrow-v .av-label {
+    position: absolute;
+    left: 18px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px; color: var(--muted);
+    white-space: nowrap;
+    background: var(--bg);
+    padding: 0 4px;
+  }
+
+  /* ── Agent card ── */
+  .agent-card {
+    border: 1.5px solid var(--ac-border, var(--border));
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+
+  .agent-card-header {
+    background: var(--ac-bg, var(--gray-l));
+    border-bottom: 1.5px solid var(--ac-border, var(--border));
+    padding: 9px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .agent-card-header .ac-id {
+    font-size: 10px; font-weight: 700;
+    color: var(--ac-color, var(--muted));
+    letter-spacing: .15em; text-transform: uppercase;
+    background: rgba(255,255,255,.7);
+    border: 1px solid var(--ac-border, var(--border));
+    padding: 1px 7px; border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .agent-card-header .ac-name {
+    font-size: 14px; font-weight: 700;
+    color: var(--text);
+    flex: 1;
+  }
+  .agent-card-header .ac-pattern {
+    font-size: 10px; font-weight: 600;
+    color: var(--ac-color, var(--muted));
+    letter-spacing: .1em;
+  }
+
+  .agent-card-body {
+    background: #fff;
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+
+  .ac-section-label {
+    font-size: 10px; font-weight: 700;
+    color: var(--muted); letter-spacing: .1em;
+    text-transform: uppercase; margin-bottom: 5px;
+  }
+  .ac-desc { font-size: 12px; color: #333; line-height: 1.6; }
+
+  .ac-tag {
+    display: inline-block;
+    font-size: 10px; padding: 2px 7px;
+    border-radius: 3px; border: 1px solid;
+    font-weight: 600; margin: 2px 2px 0 0;
+  }
+
+  .ac-note {
+    font-size: 11px; color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding: 8px 14px;
+    background: #fafafa;
+    line-height: 1.6;
+  }
+
+  /* ── Swappable ── */
+  .swappable {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700;
+    color: var(--purple);
+    border: 1px dashed var(--purple);
+    background: var(--purple-l);
+    padding: 2px 8px; border-radius: 3px;
+    letter-spacing: .1em;
+    margin-top: 6px;
+  }
+
+  /* ════════════════════════════
+     CONCURRENT BLOCK (Readers)
+  ═══════════════════════════════ */
+  .concurrent-wrap {
+    border: 2px dashed #107c10;
+    border-radius: 8px;
+    padding: 16px;
+    background: rgba(16,124,16,.025);
+    position: relative;
+  }
+
+  .concurrent-label {
+    position: absolute;
+    top: -12px; left: 16px;
+    background: #fff;
+    padding: 0 8px;
+    font-size: 11px; font-weight: 700;
+    color: var(--green); letter-spacing: .12em;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .concurrent-label .badge {
+    background: var(--green); color: #fff;
+    font-size: 10px; padding: 1px 7px; border-radius: 2px;
+  }
+
+  /* Fan-out arrows */
+  .fanout {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin: 0;
+    position: relative;
+  }
+
+  .fanout-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+  }
+
+  /* reader grid */
+  .readers-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .reader-card {
+    border: 1.5px solid rgba(16,124,16,.4);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+
+  .reader-card-hdr {
+    background: var(--green-l);
+    border-bottom: 1px solid rgba(16,124,16,.3);
+    padding: 7px 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .reader-id {
+    font-size: 10px; font-weight: 700; color: var(--green);
+    letter-spacing: .1em; text-transform: uppercase;
+    background: rgba(255,255,255,.8);
+    border: 1px solid rgba(16,124,16,.3);
+    padding: 1px 6px; border-radius: 2px;
+  }
+  .reader-name { font-size: 12px; font-weight: 700; color: var(--text); }
+
+  .reader-card-body {
+    background: #fff;
+    padding: 8px 10px;
+  }
+  .reader-desc { font-size: 11px; color: #444; line-height: 1.5; margin-bottom: 6px; }
+
+  .reader-out {
+    background: var(--green-l);
+    border: 1px solid rgba(16,124,16,.25);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 10px; color: var(--green);
+    line-height: 1.55; font-family: monospace;
+  }
+
+  /* dynamic card */
+  .reader-card.dynamic {
+    border-style: dashed;
+    opacity: .55;
+  }
+
+  .concurrent-note {
+    background: #fff;
+    border: 1px solid rgba(16,124,16,.3);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 11px; color: #444; line-height: 1.6;
+  }
+
+  /* Fanin arrow */
+  .fanin-note {
+    text-align: center;
+    font-size: 10px; color: var(--green);
+    font-weight: 600; letter-spacing: .1em;
+    margin: 8px 0 0;
+    padding: 4px 12px;
+    background: var(--green-l);
+    border: 1px solid rgba(16,124,16,.25);
+    border-radius: 3px;
+    width: fit-content;
+    margin: 6px auto 0;
+  }
+
+  /* ── Summary band ── */
+  .summary-band {
+    border: 1px solid rgba(164,38,44,.3);
+    border-radius: 4px;
+    padding: 7px 14px;
+    background: var(--red-l);
+    font-size: 11px; font-weight: 600;
+    color: var(--red);
+    display: flex; align-items: center; gap: 8px;
+    justify-content: center;
+  }
+
+  /* ── Common state bar (Sequential) ── */
+  .common-state-wrap {
+    position: relative;
+    padding-left: 18px;
+  }
+  .common-state-bar {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 6px; border-radius: 3px;
+    background: var(--blue);
+    opacity: .2;
+  }
+
+  /* ── KB side panel ── */
+  .layout-with-kb {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .kb-panel {
+    border: 1.5px solid rgba(0,130,114,.4);
+    border-radius: 6px;
+    overflow: hidden;
+    position: sticky;
+    top: 20px;
+  }
+  .kb-panel-hdr {
+    background: var(--teal-l);
+    border-bottom: 1px solid rgba(0,130,114,.3);
+    padding: 9px 12px;
+    font-size: 12px; font-weight: 700; color: var(--teal);
+    letter-spacing: .05em;
+  }
+  .kb-panel-body { padding: 10px 12px; background: #fff; }
+
+  .kb-folder {
+    margin-bottom: 10px;
+  }
+  .kb-folder-label {
+    font-size: 10px; font-weight: 700; color: var(--muted);
+    letter-spacing: .12em; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .kb-item {
+    display: flex; gap: 7px; align-items: flex-start;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin-bottom: 3px;
+    background: var(--gray-l);
+    font-size: 11px;
+  }
+  .kb-item-name { font-weight: 600; color: var(--text); display: block; }
+  .kb-item-sub  { color: var(--muted); font-size: 10px; display: block; margin-top: 1px; }
+
+  .kb-access-row { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+  .kb-badge {
+    font-size: 9px; font-weight: 700; padding: 1px 6px;
+    border-radius: 2px; border: 1px solid;
+  }
+  .kb-badge-idx  { background: var(--blue-l);  border-color: rgba(0,120,212,.4); color: var(--blue); }
+  .kb-badge-read { background: var(--green-l); border-color: rgba(16,124,16,.4); color: var(--green); }
+  .kb-badge-none { background: var(--red-l);   border-color: rgba(164,38,44,.3); color: var(--red); }
+
+  .kb-legend {
+    border-top: 1px solid var(--border);
+    padding: 8px 10px;
+    background: var(--gray-l);
+    font-size: 10px; color: var(--muted); line-height: 1.7;
+  }
+
+  /* ── Legend bar ── */
+  .legend-bar {
+    display: flex; flex-wrap: wrap; gap: 18px;
+    margin-top: 32px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--muted);
+  }
+  .ldot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .l-dashed { border: 1.5px dashed; background: transparent !important; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div>
+    <h1>FISC アンケート自動回答システム — マルチエージェント構成</h1>
+    <p>Sequential Orchestration（全体パイプライン）＋ Concurrent Orchestration（Parallel Readers）</p>
+  </div>
+  <div class="page-meta">
+    <div>v2.1　2026-03-07</div>
+    <div>参照：Microsoft Azure Architecture Center</div>
+    <div>AI Agent Orchestration Patterns</div>
+  </div>
+</div>
+
+<div class="layout-with-kb">
+
+<!-- ════ Main pipeline ════ -->
+<div>
+
+  <!-- Sequential label -->
+  <div class="seq-label">
+    <span class="badge">Sequential Orchestration</span>
+    全体パイプライン — 各エージェントが前段の出力を受け取り順次処理
+  </div>
+
+  <div class="common-state-wrap">
+    <div class="common-state-bar"></div>
+
+    <!-- INPUT -->
+    <div class="io-box">
+      <div class="io-icon">📥</div>
+      <div>
+        <div class="io-label">User Input</div>
+        <div class="io-name">アンケート質問表</div>
+        <div class="io-sub">FISCより受領した金融機関アンケート回答票　questionnaire.xlsx</div>
+      </div>
+    </div>
+
+    <!-- ↓ -->
+    <div class="arrow-v">
+      <div class="av-line"></div>
+      <div class="av-head"></div>
+    </div>
+
+    <!-- Agent 0: Orchestrator -->
+    <div class="agent-card" style="--ac-bg:#e8f3fb; --ac-border:#0078d4; --ac-color:#0078d4;">
+      <div class="agent-card-header">
+        <div class="ac-id">Agent 0</div>
+        <div class="ac-name">オーケストレーター</div>
+        <div class="ac-pattern">Sequential — 制御</div>
+      </div>
+      <div class="agent-card-body">
+        <div>
+          <div class="ac-section-label">役割</div>
+          <div class="ac-desc">全体フローを制御する司令塔。各エージェントを順番に呼び出しエラー処理・リトライを担当。</div>
+        </div>
+        <div>
+          <div class="ac-section-label">Input</div>
+          <span class="ac-tag" style="background:#e8f3fb; border-color:#0078d4; color:#0078d4;">質問リストJSON</span>
+        </div>
+        <div>
+          <div class="ac-section-label">技術スタック</div>
+          <span class="ac-tag" style="background:#f3f3f3; border-color:#ccc; color:#555;">Python asyncio</span>
+          <span class="ac-tag" style="background:#f3f3f3; border-color:#ccc; color:#555;">並列制御</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ↓ -->
+    <div class="arrow-v">
+      <div class="av-line"></div>
+      <div class="av-head"></div>
+      <div class="av-label">ファイルパス一覧</div>
+    </div>
+
+    <!-- Agent 1: Indexer -->
+    <div class="agent-card" style="--ac-bg:#e8f3fb; --ac-border:#0078d4; --ac-color:#0078d4;">
+      <div class="agent-card-header">
+        <div class="ac-id">Agent 1</div>
+        <div class="ac-name">Indexer　—　インデックスエージェント</div>
+        <div class="ac-pattern">Sequential</div>
+      </div>
+      <div class="agent-card-body">
+        <div>
+          <div class="ac-section-label">役割</div>
+          <div class="ac-desc">毎回実行。ファイル名・パス・<strong>先頭1〜2ページのみ</strong>を読み軽量インデックスを生成。全文は読まない。</div>
+        </div>
+        <div>
+          <div class="ac-section-label">Input　→　Output</div>
+          <span class="ac-tag" style="background:#e8f3fb; border-color:#0078d4; color:#0078d4;">KB先頭ページ</span>
+          <div style="margin-top:5px; font-size:12px; color:#666;">→</div>
+          <span class="ac-tag" style="background:#dff6dd; border-color:#107c10; color:#107c10;">軽量インデックスJSON</span>
+        </div>
+        <div>
+          <div class="ac-section-label">技術スタック</div>
+          <span class="ac-tag" style="background:#f3f3f3; border-color:#ccc; color:#555;">PyMuPDF</span>
+          <span class="ac-tag" style="background:#f3f3f3; border-color:#ccc; color:#555;">python-docx</span>
+          <span class="ac-tag" style="background:#f3f3f3; border-color:#ccc; color:#555;">高速・低コスト</span>
+        </div>
+      </div>
+      <div class="ac-note">
+        出力例：{ "file": "security_policy.pdf", "path": "policies/", "summary": "パスワード・MFA・暗号化方針…", "est_tokens": 42000 }
+      </div>
+    </div>
+
+    <!-- ↓ -->
+    <div class="arrow-v">
+      <div class="av-line"></div>
+      <div class="av-head"></div>
+      <div class="av-label">インデックスJSON ＋ 質問リスト</div>
+    </div>
+
+    <!-- Agent 2: Router -->
+    <div class="agent-card" style="--ac-bg:#f4eeff; --ac-border:#5c2d91; --ac-color:#5c2d91;">
+      <div class="agent-card-header">
+        <div class="ac-id">Agent 2</div>
+        <div class="ac-name">Router　—　ルーティングエージェント</div>
+        <div class="ac-pattern">Sequential</div>
+      </div>
+      <div class="agent-card-body">
+        <div>
+          <div class="ac-section-label">役割</div>
+          <div class="ac-desc">推定トークン量をもとに1 Reader上限（初期値80K tokens）内で質問とファイルを動的割振り。<strong>Reader数はここで決定。</strong></div>
+        </div>
+        <div>
+          <div class="ac-section-label">Input　→　Output</div>
+          <span class="ac-tag" style="background:#e8f3fb; border-color:#0078d4; color:#0078d4;">インデックスJSON</span>
+          <div style="margin-top:5px; font-size:12px; color:#666;">→</div>
+          <span class="ac-tag" style="background:#f4eeff; border-color:#5c2d91; color:#5c2d91;">ルーティングマップ</span>
+        </div>
+        <div>
+          <div class="ac-section-label">技術スタック</div>
+          <span class="ac-tag" style="background:#f3f3f3; border-color:#ccc; color:#555;">Claude API（軽量）</span>
+          <span class="ac-tag" style="background:#f3f3f3; border-color:#ccc; color:#555;">トークン予算分割</span>
+        </div>
+      </div>
+      <div class="ac-note" style="display:flex; align-items:center; gap:10px;">
+        <span class="swappable">⚡ SWAPPABLE</span>
+        <span>ルーティングロジックはこのエージェントのみ差し替え可能。静的ルールベース↔動的推論を切り替えられる設計。</span>
+      </div>
+    </div>
+
+    <!-- ↓ fan-out -->
+    <div class="arrow-v">
+      <div class="av-line"></div>
+      <div class="av-head"></div>
+      <div class="av-label">割当ファイル ＋ 担当質問（並列dispatch）</div>
+    </div>
+
+    <!-- ════ CONCURRENT BLOCK ════ -->
+    <div class="concurrent-wrap">
+      <div class="concurrent-label">
+        <span class="badge">Concurrent Orchestration</span>
+        Parallel Readers — 独立並列実行（Fan-out / Fan-in）
+      </div>
+
+      <div class="readers-grid">
+
+        <!-- Reader A -->
+        <div class="reader-card">
+          <div class="reader-card-hdr">
+            <div class="reader-id">Reader A</div>
+            <div class="reader-name">割当グループ A</div>
+          </div>
+          <div class="reader-card-body">
+            <div class="reader-desc">割り当てられたファイルの<strong>全文</strong>を読み、担当質問に対して回答・根拠・信頼度を生成。</div>
+            <div class="reader-out">
+              answer / source<br>key_excerpt / confidence
+            </div>
+          </div>
+        </div>
+
+        <!-- Reader B -->
+        <div class="reader-card">
+          <div class="reader-card-hdr">
+            <div class="reader-id">Reader B</div>
+            <div class="reader-name">割当グループ B</div>
+          </div>
+          <div class="reader-card-body">
+            <div class="reader-desc">割り当てられたファイルの<strong>全文</strong>を読み、担当質問に対して回答・根拠・信頼度を生成。</div>
+            <div class="reader-out">
+              answer / source<br>key_excerpt / confidence
+            </div>
+          </div>
+        </div>
+
+        <!-- Reader N (dynamic) -->
+        <div class="reader-card dynamic">
+          <div class="reader-card-hdr">
+            <div class="reader-id">Reader N</div>
+            <div class="reader-name">割当グループ N</div>
+          </div>
+          <div class="reader-card-body">
+            <div class="reader-desc">ファイル量に応じて<strong>動的に追加</strong>される。上限トークン超過時にRouterが自動生成。</div>
+            <div class="reader-out" style="border-style:dashed; opacity:.7;">
+              answer / source<br>key_excerpt / confidence
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="concurrent-note">
+        ⚠ 各 Reader は互いの結果を参照しない（独立実行）。結果の集約・矛盾解消は次段の Reviewer が担当（Fan-in）。
+        Reader の数は毎回 Router が動的に決定する。
+      </div>
+
+      <div class="fanin-note">↑ 構造化サマリーのみ Fan-in（ドキュメント全文は渡さない）</div>
+    </div>
+
+    <!-- ↓ summary only -->
+    <div class="arrow-v">
+      <div class="av-line"></div>
+      <div class="av-head"></div>
+    </div>
+    <div class="summary-band">
+      🔒　Reviewer へ渡すのは構造化サマリーのみ　—　ドキュメント全文は渡さない（Reviewer メモリ安全設計）
+    </div>
+    <div class="arrow-v">
+      <div class="av-line"></div>
+      <div class="av-head"></div>
+    </div>
+
+    <!-- Agent 4: Reviewer -->
+    <div class="agent-card" style="--ac-bg:#fde7e9; --ac-border:#a4262c; --ac-color:#a4262c;">
+      <div class="agent-card-header">
+        <div class="ac-id">Agent 4</div>
+        <div class="ac-name">Reviewer　—　レビューエージェント</div>
+        <div class="ac-pattern">Sequential — 集約・品質チェック</div>
+      </div>
+      <div class="agent-card-body">
+        <div>
+          <div class="ac-section-label">役割</div>
+          <div class="ac-desc">全 Reader の構造化サマリー<strong>のみ</strong>を参照。矛盾チェック・整合性確認・信頼度最終判定・🚩フラグ付与。</div>
+        </div>
+        <div>
+          <div class="ac-section-label">Input　→　Output</div>
+          <span class="ac-tag" style="background:#fde7e9; border-color:#a4262c; color:#a4262c;">構造化サマリーJSON</span>
+          <div style="margin-top:5px; font-size:12px; color:#666;">→</div>
+          <span class="ac-tag" style="background:#dff6dd; border-color:#107c10; color:#107c10;">最終回答JSON ＋ 🚩フラグ</span>
+        </div>
+        <div>
+          <div class="ac-section-label">品質基準</div>
+          <span class="ac-tag" style="background:#dff6dd; border-color:#107c10; color:#107c10;">≥80% 承認推奨</span>
+          <span class="ac-tag" style="background:#fff4e5; border-color:#d83b01; color:#d83b01;">60–79% 要確認</span>
+          <span class="ac-tag" style="background:#fde7e9; border-color:#a4262c; color:#a4262c;">&lt;60% 🚩要修正</span>
+        </div>
+      </div>
+      <div class="ac-note">
+        コンテキスト量：質問数 × サマリー数百token　→　ドキュメントが100・200件に増えてもメモリは肥大しない
+      </div>
+    </div>
+
+    <!-- ↓ -->
+    <div class="arrow-v">
+      <div class="av-line"></div>
+      <div class="av-head"></div>
+    </div>
+
+    <!-- OUTPUT -->
+    <div class="io-box" style="background:#e8f3fb; border-color:#0078d4;">
+      <div class="io-icon">📤</div>
+      <div>
+        <div class="io-label" style="color:#0078d4;">Output</div>
+        <div class="io-name">レビューUI → 承認 → Excel出力</div>
+        <div class="io-sub">completed_answers.xlsx　（回答・根拠・信頼度・🚩フラグ・担当者コメント）</div>
+      </div>
+    </div>
+
+  </div><!-- /common-state-wrap -->
+</div>
+
+<!-- ════ KB panel ════ -->
+<div class="kb-panel">
+  <div class="kb-panel-hdr">📁　Knowledge Base</div>
+  <div class="kb-panel-body">
+
+    <div class="kb-folder">
+      <div class="kb-folder-label">policies/</div>
+      <div class="kb-item">
+        <span>📄</span>
+        <div>
+          <span class="kb-item-name">security_policy.pdf</span>
+          <span class="kb-item-sub">パスワード・MFA・暗号化</span>
+          <div class="kb-access-row">
+            <span class="kb-badge kb-badge-idx">Idx: 先頭のみ</span>
+            <span class="kb-badge kb-badge-read">Rdr: 全文</span>
+          </div>
+        </div>
+      </div>
+      <div class="kb-item">
+        <span>📄</span>
+        <div>
+          <span class="kb-item-name">access_control.pdf</span>
+          <span class="kb-item-sub">アクセス制御・権限管理</span>
+          <div class="kb-access-row">
+            <span class="kb-badge kb-badge-idx">Idx: 先頭のみ</span>
+            <span class="kb-badge kb-badge-read">Rdr: 全文</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kb-folder">
+      <div class="kb-folder-label">past_answers/</div>
+      <div class="kb-item">
+        <span>📋</span>
+        <div>
+          <span class="kb-item-name">past_answer_2024.xlsx</span>
+          <span class="kb-item-sub">過去の回答実績</span>
+          <div class="kb-access-row">
+            <span class="kb-badge kb-badge-idx">Idx: 先頭のみ</span>
+            <span class="kb-badge kb-badge-read">Rdr: 全文</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kb-folder">
+      <div class="kb-folder-label">system_docs/</div>
+      <div class="kb-item">
+        <span>🔧</span>
+        <div>
+          <span class="kb-item-name">infra_overview.pdf</span>
+          <span class="kb-item-sub">インフラ・DR・RTO/RPO</span>
+          <div class="kb-access-row">
+            <span class="kb-badge kb-badge-idx">Idx: 先頭のみ</span>
+            <span class="kb-badge kb-badge-read">Rdr: 全文</span>
+          </div>
+        </div>
+      </div>
+      <div class="kb-item">
+        <span>🔧</span>
+        <div>
+          <span class="kb-item-name">operation_manual.pdf</span>
+          <span class="kb-item-sub">運用・インシデント・監査</span>
+          <div class="kb-access-row">
+            <span class="kb-badge kb-badge-idx">Idx: 先頭のみ</span>
+            <span class="kb-badge kb-badge-read">Rdr: 全文</span>
+          </div>
+        </div>
+      </div>
+      <div class="kb-item" style="border-style:dashed; opacity:.55;">
+        <span>📁</span>
+        <div>
+          <span class="kb-item-name">… 数百ファイルまで対応</span>
+          <div class="kb-access-row">
+            <span class="kb-badge kb-badge-idx">Idx: 先頭のみ</span>
+            <span class="kb-badge kb-badge-read">Rdr: 全文</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="kb-legend">
+    <strong>Idx</strong>（Indexer）= 先頭1〜2ページのみ読む<br>
+    <strong>Rdr</strong>（Reader）= 割当分の全文を読む<br>
+    <span style="color:#a4262c;font-weight:600;">Reviewer</span> = ドキュメントを一切読まない
+  </div>
+</div>
+
+</div><!-- /layout-with-kb -->
+
+<!-- Legend -->
+<div class="legend-bar">
+  <div style="font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.1em; text-transform:uppercase; margin-right:4px;">パターン</div>
+  <div class="legend-item">
+    <div class="ldot" style="background:#0078d4;"></div>
+    Sequential Orchestration（全体パイプライン）
+  </div>
+  <div class="legend-item">
+    <div class="ldot l-dashed" style="border-color:#107c10;"></div>
+    Concurrent Orchestration（Parallel Readers）
+  </div>
+  <div class="legend-item">
+    <div class="ldot" style="background:#5c2d91;"></div>
+    SWAPPABLE（Router — 差し替え可能）
+  </div>
+  <div class="legend-item">
+    <div class="ldot" style="background:#a4262c;"></div>
+    Reviewer（サマリーのみ — メモリ安全）
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,162 @@
+{
+  "1": {
+    "question": "情報セキュリティポリシーを策定・文書化していますか？また、定期的に見直しを行っていますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "2": {
+    "question": "情報セキュリティの責任者（CISO等）を任命し、責任・権限を明確にしていますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "3": {
+    "question": "システムへのアクセスにはID・パスワードによる認証を実施していますか？パスワードの複雑性要件はありますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "4": {
+    "question": "ユーザーの権限は業務上必要最小限の範囲に制限されていますか？（最小権限の原則）",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "5": {
+    "question": "管理者権限（特権アカウント）の利用は制限・記録されていますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "6": {
+    "question": "サーバー・クライアント端末にウイルス対策ソフトを導入していますか？定義ファイルの更新頻度はどうなっていますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "7": {
+    "question": "外部記憶媒体（USBメモリ等）の利用制限はありますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "8": {
+    "question": "インターネットとの接続にはファイアウォールを設置していますか？また、不要なポートは閉鎖されていますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "9": {
+    "question": "外部との通信にはTLS等の暗号化プロトコルを使用していますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "10": {
+    "question": "IDS/IPS（不正侵入検知・防止システム）を導入していますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "11": {
+    "question": "重要データのバックアップはどのような頻度・方式で実施していますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "12": {
+    "question": "バックアップデータからの復旧テストを定期的に実施していますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "13": {
+    "question": "セキュリティインシデントが発生した場合の対応手順（インシデントレスポンス計画）はありますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "14": {
+    "question": "インシデント発生時の上長・関係機関への報告体制はありますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "15": {
+    "question": "システムの変更（パッチ適用・設定変更等）に際して、変更管理手順を定めていますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "16": {
+    "question": "OSやミドルウェアのセキュリティパッチは定期的に適用していますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "17": {
+    "question": "サーバー室等の機密エリアへの入退室管理（ICカード等）を実施していますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "18": {
+    "question": "サーバー室の空調・電源・消火設備は整備されていますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "19": {
+    "question": "従業員に対して情報セキュリティ教育を定期的に実施していますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  },
+  "20": {
+    "question": "フィッシングメール等の標的型攻撃を想定した訓練を実施していますか？",
+    "answer": "",
+    "status": "",
+    "evidence": "",
+    "confidence": "",
+    "needs_review": true
+  }
+}

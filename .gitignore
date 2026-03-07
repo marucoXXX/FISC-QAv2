@@ -44,3 +44,9 @@ desktop.ini
 knowledge_base/
 *.xlsx
 !docs/**/*.xlsx
+!tests/fixtures/**/*.xlsx
+
+# FISC-QAv2 固有
+.fisc_index_cache.json
+output/
+~$*.xlsx

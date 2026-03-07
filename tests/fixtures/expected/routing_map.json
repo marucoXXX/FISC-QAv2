@@ -1,0 +1,162 @@
+{
+  "1": {
+    "major": "セキュリティ管理",
+    "minor": "ポリシー管理",
+    "assigned_sources": [
+      "policies/security_policy.pdf",
+      "past_answers/past_answer_2024.xlsx"
+    ]
+  },
+  "2": {
+    "major": "セキュリティ管理",
+    "minor": "組織体制",
+    "assigned_sources": [
+      "policies/security_policy.pdf",
+      "past_answers/past_answer_2024.xlsx"
+    ]
+  },
+  "3": {
+    "major": "アクセス管理",
+    "minor": "ユーザー認証",
+    "assigned_sources": [
+      "policies/access_control_policy.pdf",
+      "policies/security_policy.pdf"
+    ]
+  },
+  "4": {
+    "major": "アクセス管理",
+    "minor": "権限管理",
+    "assigned_sources": [
+      "policies/access_control_policy.pdf",
+      "policies/security_policy.pdf"
+    ]
+  },
+  "5": {
+    "major": "アクセス管理",
+    "minor": "特権アカウント",
+    "assigned_sources": [
+      "policies/access_control_policy.pdf",
+      "policies/security_policy.pdf"
+    ]
+  },
+  "6": {
+    "major": "ウイルス対策",
+    "minor": "マルウェア対策",
+    "assigned_sources": [
+      "policies/security_policy.pdf",
+      "system_docs/operation_manual.pdf"
+    ]
+  },
+  "7": {
+    "major": "ウイルス対策",
+    "minor": "不正プログラム",
+    "assigned_sources": [
+      "policies/security_policy.pdf",
+      "system_docs/operation_manual.pdf"
+    ]
+  },
+  "8": {
+    "major": "ネットワーク管理",
+    "minor": "境界防御",
+    "assigned_sources": [
+      "system_docs/infra_overview.pdf",
+      "policies/encryption_standards.pdf"
+    ]
+  },
+  "9": {
+    "major": "ネットワーク管理",
+    "minor": "通信暗号化",
+    "assigned_sources": [
+      "system_docs/infra_overview.pdf",
+      "policies/encryption_standards.pdf"
+    ]
+  },
+  "10": {
+    "major": "ネットワーク管理",
+    "minor": "不正侵入検知",
+    "assigned_sources": [
+      "system_docs/infra_overview.pdf",
+      "policies/encryption_standards.pdf"
+    ]
+  },
+  "11": {
+    "major": "バックアップ管理",
+    "minor": "バックアップ",
+    "assigned_sources": [
+      "system_docs/dr_bcp_plan.pdf",
+      "system_docs/infra_overview.pdf"
+    ]
+  },
+  "12": {
+    "major": "バックアップ管理",
+    "minor": "復旧テスト",
+    "assigned_sources": [
+      "system_docs/dr_bcp_plan.pdf",
+      "system_docs/infra_overview.pdf"
+    ]
+  },
+  "13": {
+    "major": "インシデント対応",
+    "minor": "対応手順",
+    "assigned_sources": [
+      "system_docs/incident_response.docx",
+      "system_docs/operation_manual.pdf"
+    ]
+  },
+  "14": {
+    "major": "インシデント対応",
+    "minor": "報告体制",
+    "assigned_sources": [
+      "system_docs/incident_response.docx",
+      "system_docs/operation_manual.pdf"
+    ]
+  },
+  "15": {
+    "major": "変更管理",
+    "minor": "変更手順",
+    "assigned_sources": [
+      "system_docs/operation_manual.pdf",
+      "system_docs/audit_compliance.docx"
+    ]
+  },
+  "16": {
+    "major": "変更管理",
+    "minor": "脆弱性管理",
+    "assigned_sources": [
+      "system_docs/operation_manual.pdf",
+      "system_docs/audit_compliance.docx"
+    ]
+  },
+  "17": {
+    "major": "物理セキュリティ",
+    "minor": "入退室管理",
+    "assigned_sources": [
+      "system_docs/infra_overview.pdf",
+      "policies/security_policy.pdf"
+    ]
+  },
+  "18": {
+    "major": "物理セキュリティ",
+    "minor": "設備管理",
+    "assigned_sources": [
+      "system_docs/infra_overview.pdf",
+      "policies/security_policy.pdf"
+    ]
+  },
+  "19": {
+    "major": "教育・訓練",
+    "minor": "セキュリティ教育",
+    "assigned_sources": [
+      "system_docs/audit_compliance.docx",
+      "policies/security_policy.pdf"
+    ]
+  },
+  "20": {
+    "major": "教育・訓練",
+    "minor": "標的型攻撃訓練",
+    "assigned_sources": [
+      "system_docs/audit_compliance.docx",
+      "policies/security_policy.pdf"
+    ]
+  }
+}
