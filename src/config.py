@@ -14,3 +14,4 @@ class Config:
     api_key: str = field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", ""))
     output_dir: str = "output"
     index_cache_path: str = ".fisc_index_cache.json"
+    use_llm_summary: bool = False
