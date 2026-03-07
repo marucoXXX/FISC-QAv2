@@ -103,6 +103,26 @@ def cmd_read(args: argparse.Namespace) -> None:
     print(json.dumps(answers_to_dicts(answers), ensure_ascii=False, indent=2))
 
 
+def cmd_serve(args: argparse.Namespace) -> None:
+    import uvicorn
+    from .config import Config
+    from .web.app import create_app
+    from .web.db import DEFAULT_DB_PATH
+
+    config = Config()
+    if args.kb_dir:
+        config.kb_dir = args.kb_dir
+    if args.model:
+        config.model = args.model
+    if args.token_budget:
+        config.token_budget_per_reader = args.token_budget
+
+    db_path = Path(args.db) if args.db else DEFAULT_DB_PATH
+    app = create_app(db_path, config=config)
+    print(f"Review UI: http://localhost:{args.port}")
+    uvicorn.run(app, host=args.host, port=args.port)
+
+
 def cmd_review(args: argparse.Namespace) -> None:
     from .excel_io import read_questionnaire
     from .models import Answer
@@ -185,6 +205,14 @@ def main() -> None:
     p_rv.add_argument("--answers", required=True, help="回答 JSON パス")
     _add_common_args(p_rv)
 
+    # --- serve ---
+    p_sv = sub.add_parser("serve", help="レビュー Web UI 起動")
+    p_sv.add_argument("--host", default="127.0.0.1", help="バインドホスト")
+    p_sv.add_argument("--port", type=int, default=8000, help="ポート番号")
+    p_sv.add_argument("--db", default=None, help="SQLite DB パス")
+    p_sv.add_argument("--kb-dir", default=None, help="KB ディレクトリパス")
+    _add_common_args(p_sv)
+
     args = parser.parse_args()
 
     cmds = {
@@ -193,6 +221,7 @@ def main() -> None:
         "route": cmd_route,
         "read": cmd_read,
         "review": cmd_review,
+        "serve": cmd_serve,
     }
     cmds[args.command](args)
 

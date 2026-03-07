@@ -10,13 +10,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+web = [
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+    "python-multipart>=0.0.6",
+]
 dev = [
     "pytest>=7.0",
     "reportlab>=4.0",
+    "httpx>=0.24",
 ]
 pdf = [
     "PyMuPDF>=1.23",
 ]
+
+[project.scripts]
+fisc-qav2 = "src.__main__:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
