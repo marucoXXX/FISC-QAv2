@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MVP ロードマップ</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=IBM+Plex+Mono:wght@400;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --muted: #666;
+    --p1: #f59e0b;   /* Phase 1 - amber */
+    --p2: #3b82f6;   /* Phase 2 - blue */
+    --p3: #10b981;   /* Phase 3 - green */
+    --p4: #f43f5e;   /* Phase 4 - rose */
+    --p5: #a78bfa;   /* Phase 5 - purple */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    padding: 52px 40px 80px;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 52px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+  }
+
+  .header-left h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(36px, 5vw, 56px);
+    letter-spacing: 0.08em;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .header-left p {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+  }
+
+  .header-right {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  /* Phase row layout */
+  .phases {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .phase {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    opacity: 0;
+    animation: slideIn 0.5s ease forwards;
+  }
+
+  .phase:last-child { border-bottom: none; }
+
+  .phase:nth-child(1) { animation-delay: 0.1s; }
+  .phase:nth-child(2) { animation-delay: 0.2s; }
+  .phase:nth-child(3) { animation-delay: 0.3s; }
+  .phase:nth-child(4) { animation-delay: 0.4s; }
+  .phase:nth-child(5) { animation-delay: 0.5s; }
+
+  /* Left: phase label */
+  .phase-label {
+    padding: 28px 24px 28px 0;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+  }
+
+  .phase-label::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--phase-color);
+  }
+
+  .phase-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    color: var(--phase-color);
+    opacity: 0.2;
+    line-height: 1;
+    letter-spacing: 0.05em;
+    padding-left: 20px;
+  }
+
+  .phase-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--phase-color);
+    padding-left: 20px;
+    letter-spacing: 0.03em;
+  }
+
+  .phase-goal {
+    font-size: 11px;
+    color: var(--muted);
+    padding-left: 20px;
+    line-height: 1.5;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Right: steps */
+  .phase-steps {
+    padding: 28px 0 28px 28px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-content: flex-start;
+  }
+
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    width: calc(33.33% - 8px);
+    min-width: 180px;
+    position: relative;
+    transition: border-color 0.2s, transform 0.2s;
+    cursor: default;
+  }
+
+  .step:hover {
+    border-color: var(--phase-color);
+    transform: translateY(-2px);
+  }
+
+  .step::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--phase-color);
+    border-radius: 6px 6px 0 0;
+    opacity: 0.5;
+  }
+
+  .step:hover::before { opacity: 1; }
+
+  .step-id {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--phase-color);
+    letter-spacing: 0.15em;
+    margin-bottom: 5px;
+    font-weight: 600;
+  }
+
+  .step-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 4px;
+  }
+
+  .step-sub {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.5;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* File tag */
+  .file-tag {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  /* Priority badge */
+  .badge-now {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8px;
+    padding: 1px 6px;
+    border-radius: 2px;
+    background: rgba(245,158,11,0.15);
+    border: 1px solid rgba(245,158,11,0.4);
+    color: #f59e0b;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+  }
+
+  /* Bottom legend */
+  .footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .footer-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-right: 8px;
+  }
+
+  .legend-phase {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>MVP ROADMAP</h1>
+    <p>FISC セキュリティアンケート自動回答システム — 開発ステップ定義</p>
+  </div>
+  <div class="header-right">
+    <div>Ver 1.0　2026-03-07</div>
+    <div>5 PHASES　／　18 STEPS</div>
+    <div>開発方式：AI ペアプログラミング</div>
+  </div>
+</div>
+
+<div class="phases">
+
+  <!-- PHASE 1 -->
+  <div class="phase" style="--phase-color: var(--p1)">
+    <div class="phase-label">
+      <div class="phase-num">01</div>
+      <div class="phase-name">テストデータ準備</div>
+      <div class="phase-goal">▸ コーディング前に<br>全ファイルを揃える</div>
+    </div>
+    <div class="phase-steps">
+      <div class="step">
+        <div class="badge-now">今すぐ</div>
+        <div class="step-id">STEP 1-1</div>
+        <div class="step-title">アンケート質問表の作成</div>
+        <div class="step-sub">FISCアンケートを想定<br>10〜15問・3形式混在</div>
+        <div class="file-tag">questionnaire_sample.xlsx</div>
+      </div>
+      <div class="step">
+        <div class="badge-now">今すぐ</div>
+        <div class="step-id">STEP 1-2</div>
+        <div class="step-title">セキュリティポリシー文書</div>
+        <div class="step-sub">架空会社の安全対策基準<br>パスワード・MFA・暗号化等</div>
+        <div class="file-tag">security_policy.pdf</div>
+      </div>
+      <div class="step">
+        <div class="badge-now">今すぐ</div>
+        <div class="step-id">STEP 1-3</div>
+        <div class="step-title">過去の回答実績</div>
+        <div class="step-sub">過去2〜3件分の回答Excelを作成</div>
+        <div class="file-tag">past_answer_2024.xlsx</div>
+      </div>
+      <div class="step">
+        <div class="badge-now">今すぐ</div>
+        <div class="step-id">STEP 1-4</div>
+        <div class="step-title">設計・運用ドキュメント</div>
+        <div class="step-sub">インフラ・DR・脆弱性診断・ログ管理等</div>
+        <div class="file-tag">system_overview.pdf</div>
+      </div>
+      <div class="step">
+        <div class="step-id">STEP 1-5</div>
+        <div class="step-title">テストデータ整合性確認</div>
+        <div class="step-sub">高信頼(8問)・低信頼(3問)を意図的に設計</div>
+        <div class="file-tag">🚩フラグ検証用</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div class="phase" style="--phase-color: var(--p2)">
+    <div class="phase-label">
+      <div class="phase-num">02</div>
+      <div class="phase-name">バックエンド実装</div>
+      <div class="phase-goal">▸ CLIまたはAPIで<br>回答JSONを返せる状態に</div>
+    </div>
+    <div class="phase-steps">
+      <div class="step">
+        <div class="step-id">STEP 2-1</div>
+        <div class="step-title">プロジェクト構成セットアップ</div>
+        <div class="step-sub">フォルダ構成・requirements.txt・環境変数設定</div>
+      </div>
+      <div class="step">
+        <div class="step-id">STEP 2-2</div>
+        <div class="step-title">ドキュメント読み込み</div>
+        <div class="step-sub">doc_loader.py<br>PDF / Word / Excel 対応</div>
+        <div class="file-tag">PyMuPDF / python-docx</div>
+      </div>
+      <div class="step">
+        <div class="step-id">STEP 2-3</div>
+        <div class="step-title">Excel質問パース</div>
+        <div class="step-sub">excel_parser.py<br>質問リストをJSON形式で出力</div>
+        <div class="file-tag">openpyxl</div>
+      </div>
+      <div class="step">
+        <div class="step-id">STEP 2-4</div>
+        <div class="step-title">Claude API 呼び出し</div>
+        <div class="step-sub">claude_client.py<br>回答・根拠・信頼度をJSON生成</div>
+        <div class="file-tag">claude-sonnet-4-5</div>
+      </div>
+      <div class="step">
+        <div class="step-id">STEP 2-5</div>
+        <div class="step-title">Excel出力</div>
+        <div class="step-sub">excel_writer.py<br>回答・フラグ・スコア列を追記</div>
+        <div class="file-tag">openpyxl / 赤ハイライト</div>
+      </div>
+      <div class="step">
+        <div class="step-id">STEP 2-6</div>
+        <div class="step-title">FastAPI エンドポイント</div>
+        <div class="step-sub">POST /run・POST /export<br>疎通テスト</div>
+        <div class="file-tag">main.py</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div class="phase" style="--phase-color: var(--p3)">
+    <div class="phase-label">
+      <div class="phase-num">03</div>
+      <div class="phase-name">フロントエンド実装</div>
+      <div class="phase-goal">▸ ブラウザ上でレビュー・<br>承認・出力できる状態に</div>
+    </div>
+    <div class="phase-steps">
+      <div class="step">
+        <div class="step-id">STEP 3-1</div>
+        <div class="step-title">React セットアップ</div>
+        <div class="step-sub">Vite 初期化・CORS設定・API接続確認</div>
+      </div>
+      <div class="step">
+        <div class="step-id">STEP 3-2</div>
+        <div class="step-title">レビュー画面の実装</div>
+        <div class="step-sub">回答カード・編集UI・🚩フラグ表示・承認ボタン</div>
+      </div>
+      <div class="step">
+        <div class="step-id">STEP 3-3</div>
+        <div class="step-title">Excel出力ボタン</div>
+        <div class="step-sub">承認済みデータをPOST → Excelダウンロード</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 4 -->
+  <div class="phase" style="--phase-color: var(--p4)">
+    <div class="phase-label">
+      <div class="phase-num">04</div>
+      <div class="phase-name">結合・テスト</div>
+      <div class="phase-goal">▸ E2Eで全シナリオを<br>テストデータで検証</div>
+    </div>
+    <div class="phase-steps">
+      <div class="step">
+        <div class="step-id">STEP 4-1</div>
+        <div class="step-title">E2E テスト実行</div>
+        <div class="step-sub">T-01〜T-05<br>アップロード → 生成 → レビュー → 出力</div>
+      </div>
+      <div class="step">
+        <div class="step-id">STEP 4-2</div>
+        <div class="step-title">品質チューニング</div>
+        <div class="step-sub">プロンプト調整・信頼度スコア精度確認・出力フォーマット修正</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 5 -->
+  <div class="phase" style="--phase-color: var(--p5)">
+    <div class="phase-label">
+      <div class="phase-num">05</div>
+      <div class="phase-name">社内デモ準備</div>
+      <div class="phase-goal">▸ デモとして見せられる<br>状態にまとめる</div>
+    </div>
+    <div class="phase-steps">
+      <div class="step">
+        <div class="step-id">STEP 5-1</div>
+        <div class="step-title">デモシナリオ作成</div>
+        <div class="step-sub">「FISCアンケート受領 → 回答生成 → レビュー → 提出」の一連の流れを整備</div>
+      </div>
+      <div class="step">
+        <div class="step-id">STEP 5-2</div>
+        <div class="step-title">README 作成</div>
+        <div class="step-sub">セットアップ手順・APIキー設定・knowledge_base管理方法</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <span class="footer-label">PHASES —</span>
+  <div class="legend-phase"><div class="legend-dot" style="background:var(--p1)"></div>01 テストデータ準備</div>
+  <div class="legend-phase"><div class="legend-dot" style="background:var(--p2)"></div>02 バックエンド実装</div>
+  <div class="legend-phase"><div class="legend-dot" style="background:var(--p3)"></div>03 フロントエンド実装</div>
+  <div class="legend-phase"><div class="legend-dot" style="background:var(--p4)"></div>04 結合・テスト</div>
+  <div class="legend-phase"><div class="legend-dot" style="background:var(--p5)"></div>05 社内デモ準備</div>
+</div>
+
+</body>
+</html>

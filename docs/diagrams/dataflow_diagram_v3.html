@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FISC アンケート自動回答システム — データフロー</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=IBM+Plex+Mono:wght@400;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f1eb;
+    --ink: #1a1a2e;
+    --ink-light: #2d2d4a;
+    --user-bg: #e8f0fe;
+    --user-border: #3d5afe;
+    --user-dark: #1a237e;
+    --sys-bg: #fce4ec;
+    --sys-border: #c62828;
+    --sys-dark: #7f0000;
+    --kb-bg: #e8f5e9;
+    --kb-border: #2e7d32;
+    --kb-dark: #1b5e20;
+    --io-arrow: #546e7a;
+    --muted: #78909c;
+    --white: #ffffff;
+    --shadow: rgba(26,26,46,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* Subtle paper texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%23f4f1eb'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='%23e0d9cc'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.6;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 52px 40px 80px;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 48px;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 20px;
+  }
+
+  .header-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.35em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(22px, 3.5vw, 36px);
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.15;
+    margin-bottom: 6px;
+  }
+
+  .header-meta {
+    display: flex;
+    gap: 24px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+
+  .header-meta span { display: flex; align-items: center; gap: 6px; }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 36px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--ink-light);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* Main swimlane grid */
+  .swimlane-wrapper {
+    display: grid;
+    grid-template-columns: 200px 1fr 1fr;
+    gap: 0;
+    border: 1.5px solid var(--ink);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 4px 4px 0 var(--shadow);
+  }
+
+  /* Column headers */
+  .col-header {
+    padding: 14px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border-bottom: 1.5px solid var(--ink);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .col-header-label { font-size: 13px; font-weight: 600; }
+  .col-header-sub { font-size: 10px; font-weight: 400; color: var(--muted); letter-spacing: 0.1em; }
+
+  .col-phase { background: #f8f5ee; border-right: 1.5px solid var(--ink); }
+  .col-user  { background: var(--user-bg); border-right: 1.5px solid var(--ink); color: var(--user-dark); }
+  .col-sys   { background: var(--sys-bg); color: var(--sys-dark); }
+
+  /* Row */
+  .row {
+    display: contents;
+  }
+
+  .row:last-child .cell { border-bottom: none; }
+
+  .cell {
+    border-bottom: 1px solid rgba(26,26,46,0.15);
+    padding: 20px 16px;
+    position: relative;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .cell-phase {
+    background: #f8f5ee;
+    border-right: 1.5px solid var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .phase-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ink);
+    opacity: 0.25;
+    line-height: 1;
+  }
+
+  .phase-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.05em;
+  }
+
+  .cell-user {
+    background: #f0f4ff;
+    border-right: 1.5px solid var(--ink);
+    border-left: 3px solid var(--user-border);
+  }
+
+  .cell-sys {
+    background: #fff8f9;
+    border-left: 3px solid var(--sys-border);
+  }
+
+  /* KB special row */
+  .cell-kb {
+    background: #f1f8f2;
+    border-left: 3px solid var(--kb-border);
+  }
+
+  /* Item inside cell */
+  .item-type {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+
+  .type-input    { color: var(--user-border); }
+  .type-output   { color: #1565c0; }
+  .type-process  { color: var(--sys-border); }
+  .type-data     { color: var(--kb-dark); }
+  .type-review   { color: #e65100; }
+
+  .item-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+
+  .item-desc {
+    font-size: 12px;
+    color: var(--ink-light);
+    line-height: 1.65;
+    opacity: 0.75;
+  }
+
+  /* File chips */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 10px;
+  }
+
+  .chip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid;
+    font-weight: 600;
+  }
+
+  .chip-blue   { background: #e3f2fd; border-color: #1976d2; color: #0d47a1; }
+  .chip-red    { background: #fce4ec; border-color: #c62828; color: #7f0000; }
+  .chip-green  { background: #e8f5e9; border-color: #388e3c; color: #1b5e20; }
+  .chip-orange { background: #fff3e0; border-color: #e65100; color: #bf360c; }
+
+  /* Arrow between user and system */
+  .arrow-col {
+    position: relative;
+  }
+
+  /* Horizontal flow arrows */
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--io-arrow);
+  }
+
+  .arrow-line-h {
+    height: 1.5px;
+    background: var(--io-arrow);
+    flex: 1;
+    position: relative;
+  }
+
+  .arrow-r::after {
+    content: '▶';
+    font-size: 9px;
+    margin-left: 2px;
+    color: var(--io-arrow);
+  }
+
+  .arrow-l::before {
+    content: '◀';
+    font-size: 9px;
+    margin-right: 2px;
+    color: var(--io-arrow);
+  }
+
+  /* KB files list */
+  .kb-files {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .kb-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--white);
+    border: 1px solid rgba(46,125,50,0.25);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--kb-dark);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .kb-file-icon { font-size: 13px; }
+  .kb-file-name { font-weight: 600; }
+  .kb-file-desc { color: var(--muted); font-weight: 400; font-size: 10px; margin-left: auto; }
+
+  /* Vertical connector between rows */
+  .v-connector {
+    grid-column: 1 / -1;
+    height: 1px;
+    background: rgba(26,26,46,0.08);
+  }
+
+  /* Output columns in Excel section */
+  .excel-cols {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  .excel-col {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 2px 7px;
+    background: #e8f5e9;
+    border: 1px solid rgba(46,125,50,0.3);
+    border-radius: 2px;
+    color: var(--kb-dark);
+  }
+
+  /* Confidence badges in review row */
+  .conf-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .conf-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  .conf-high   { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+  .conf-mid    { background: #fff8e1; color: #f57f17; border: 1px solid #ffe082; }
+  .conf-low    { background: #fce4ec; color: #c62828; border: 1px solid #ef9a9a; }
+
+  /* Empty cell placeholder */
+  .cell-empty {
+    background: #f8f5ee;
+    border-right: 1.5px solid var(--ink);
+    opacity: 0.4;
+  }
+
+  .cell-empty-sys {
+    background: #f8f5ee;
+    opacity: 0.4;
+  }
+
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .swimlane-wrapper { animation: fadeIn 0.6s ease both; }
+  .header { animation: fadeIn 0.5s ease both; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-eyebrow">System Design / Data Flow Diagram</div>
+    <h1>FISCアンケート自動回答システム<br>データフロー設計図</h1>
+    <div class="header-meta">
+      <span>Ver 1.1 MVP</span>
+      <span>2026-03-07</span>
+      <span>シンプルアーキテクチャ（RAGなし・全文渡し）</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#3d5afe"></div>ユーザーアクション</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#c62828"></div>システム処理</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2e7d32"></div>システム内部データ（知識ベース）</div>
+  </div>
+
+  <div class="swimlane-wrapper">
+
+    <!-- Column headers -->
+    <div class="col-header col-phase">
+      <div class="col-header-label">フェーズ</div>
+    </div>
+    <div class="col-header col-user">
+      <div class="col-header-label">👤 ユーザー</div>
+      <div class="col-header-sub">INPUT / REVIEW / OUTPUT受取</div>
+    </div>
+    <div class="col-header col-sys">
+      <div class="col-header-label">⚙️ システム</div>
+      <div class="col-header-sub">PROCESS / DATA / OUTPUT生成</div>
+    </div>
+
+    <!-- ─── ROW 1: INPUT ─── -->
+    <div class="cell cell-phase">
+      <div class="phase-num">01</div>
+      <div class="phase-label">インプット</div>
+    </div>
+
+    <div class="cell cell-user">
+      <div class="item-type type-input">▲ INPUT</div>
+      <div class="item-title">アンケート質問表をアップロード</div>
+      <div class="item-desc">FISCより受領した金融機関アンケート回答票（Excel）をシステムに渡す</div>
+      <div class="chips">
+        <span class="chip chip-blue">questionnaire.xlsx</span>
+      </div>
+      <div class="flow-arrow">
+        <span>アップロード</span>
+        <div class="arrow-line-h"></div>
+        <span class="arrow-r"></span>
+      </div>
+    </div>
+
+    <div class="cell cell-sys">
+      <div class="item-type type-process">⚙ PROCESS</div>
+      <div class="item-title">質問パース</div>
+      <div class="item-desc">Excelを行ごとに読み込み、質問テキストを抽出・正規化して処理リストを生成する</div>
+      <div class="chips">
+        <span class="chip chip-red">openpyxl</span>
+        <span class="chip chip-red">正規化・重複排除</span>
+      </div>
+    </div>
+
+    <!-- ─── ROW 2: INTERNAL DATA ─── -->
+    <div class="cell cell-phase">
+      <div class="phase-num">02</div>
+      <div class="phase-label">内部データ</div>
+    </div>
+
+    <div class="cell cell-empty" style="background:#f0f4ff; border-right: 1.5px solid var(--ink);">
+      <!-- User has nothing to do here -->
+    </div>
+
+    <div class="cell cell-kb">
+      <div class="item-type type-data">◈ SYSTEM DATA（知識ベース）</div>
+      <div class="item-title">ドキュメント全文読み込み</div>
+      <div class="item-desc">/knowledge_base/ 以下の全ファイルをテキスト化し、メモリに展開（〜10ファイル・RAG不要）</div>
+      <div class="kb-files">
+        <div class="kb-file">
+          <span class="kb-file-icon">📄</span>
+          <span class="kb-file-name">policies/</span>
+          <span class="kb-file-desc">セキュリティポリシー文書</span>
+        </div>
+        <div class="kb-file">
+          <span class="kb-file-icon">📋</span>
+          <span class="kb-file-name">past_answers/</span>
+          <span class="kb-file-desc">過去のアンケート回答実績</span>
+        </div>
+        <div class="kb-file">
+          <span class="kb-file-icon">🔧</span>
+          <span class="kb-file-name">system_docs/</span>
+          <span class="kb-file-desc">設計・運用ドキュメント</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── ROW 3: AI PROCESSING ─── -->
+    <div class="cell cell-phase">
+      <div class="phase-num">03</div>
+      <div class="phase-label">AI処理</div>
+    </div>
+
+    <div class="cell cell-empty" style="background:#f0f4ff; border-right: 1.5px solid var(--ink);">
+      <!-- User has nothing to do here -->
+    </div>
+
+    <div class="cell cell-sys">
+      <div class="item-type type-process">⚙ PROCESS</div>
+      <div class="item-title">Claude API 呼び出し</div>
+      <div class="item-desc">「質問リスト ＋ ドキュメント全文」をコンテキストとして送信。各質問に対して回答・根拠・信頼度スコアをJSON形式で生成する</div>
+      <div class="chips">
+        <span class="chip chip-red">claude-sonnet-4-5</span>
+        <span class="chip chip-red">max 200k tokens</span>
+      </div>
+      <div class="chips" style="margin-top:6px">
+        <span class="chip chip-orange">回答テキスト</span>
+        <span class="chip chip-orange">根拠ソース名</span>
+        <span class="chip chip-orange">confidence 0–100</span>
+      </div>
+    </div>
+
+    <!-- ─── ROW 4: REVIEW ─── -->
+    <div class="cell cell-phase">
+      <div class="phase-num">04</div>
+      <div class="phase-label">レビュー</div>
+    </div>
+
+    <div class="cell cell-user">
+      <div class="item-type type-review">↔ REVIEW</div>
+      <div class="item-title">回答を確認・修正・承認</div>
+      <div class="item-desc">回答内容・根拠ドキュメント・信頼度スコアをUIで確認し、必要に応じて編集・承認する。フラグ付き（🚩）の質問は優先レビュー</div>
+      <div class="conf-badges">
+        <span class="conf-badge conf-high">≥80%　承認推奨</span>
+        <span class="conf-badge conf-mid">60–79%　要確認</span>
+        <span class="conf-badge conf-low">＜60%　🚩 要修正</span>
+      </div>
+      <div class="flow-arrow">
+        <span class="arrow-l"></span>
+        <div class="arrow-line-h"></div>
+        <span>回答・根拠・スコアを表示</span>
+      </div>
+    </div>
+
+    <div class="cell cell-sys">
+      <div class="item-type type-process">⚙ PROCESS</div>
+      <div class="item-title">レビューUI 提供</div>
+      <div class="item-desc">質問・AI回答・根拠ドキュメント・信頼度スコアを一覧表示するReact画面を提供。編集内容をリアルタイムに保持する</div>
+      <div class="chips">
+        <span class="chip chip-red">React</span>
+        <span class="chip chip-red">FastAPI</span>
+      </div>
+    </div>
+
+    <!-- ─── ROW 5: OUTPUT ─── -->
+    <div class="cell cell-phase" style="border-bottom:none">
+      <div class="phase-num">05</div>
+      <div class="phase-label">アウトプット</div>
+    </div>
+
+    <div class="cell cell-user" style="border-bottom:none">
+      <div class="item-type type-output">▼ OUTPUT</div>
+      <div class="item-title">回答済みExcelを受け取る</div>
+      <div class="item-desc">承認済み回答・根拠・信頼度・フラグがすべて記入されたExcelファイルをダウンロードし、FISCへ提出する</div>
+      <div class="chips">
+        <span class="chip chip-blue">completed_answers.xlsx</span>
+      </div>
+      <div class="flow-arrow">
+        <span class="arrow-l"></span>
+        <div class="arrow-line-h"></div>
+        <span>Excelダウンロード</span>
+      </div>
+    </div>
+
+    <div class="cell cell-sys" style="border-bottom:none">
+      <div class="item-type type-process">⚙ PROCESS</div>
+      <div class="item-title">Excel出力生成</div>
+      <div class="item-desc">承認済みデータを元のExcelに書き込み、ダウンロード用ファイルを生成する</div>
+      <div class="excel-cols">
+        <span class="excel-col">質問No.</span>
+        <span class="excel-col">質問テキスト</span>
+        <span class="excel-col">回答</span>
+        <span class="excel-col">根拠ドキュメント</span>
+        <span class="excel-col">信頼度</span>
+        <span class="excel-col">🚩フラグ</span>
+        <span class="excel-col">担当者コメント</span>
+      </div>
+    </div>
+
+  </div><!-- /swimlane-wrapper -->
+
+</div><!-- /page -->
+</body>
+</html>
