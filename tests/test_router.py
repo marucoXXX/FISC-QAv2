@@ -23,7 +23,7 @@ class TestRouter:
 
     def test_routing_map_structure(self, expected_routing_map: dict):
         """ルーティングマップが正しい構造を持つこと。"""
-        assert len(expected_routing_map) == 20
+        assert len(expected_routing_map) == 30
         for qno, mapping in expected_routing_map.items():
             assert "major" in mapping
             assert "minor" in mapping
@@ -36,12 +36,13 @@ class TestRouter:
         expected = {
             "セキュリティ管理", "アクセス管理", "ウイルス対策", "ネットワーク管理",
             "バックアップ管理", "インシデント対応", "変更管理", "物理セキュリティ", "教育・訓練",
+            "外部委託管理", "システム開発", "ログ・監視",
         }
         assert majors == expected
 
     def test_sources_are_valid_paths(self, expected_routing_map: dict):
         """割り当てソースが妥当なパスであること。"""
-        valid_prefixes = ("policies/", "past_answers/", "system_docs/")
+        valid_prefixes = ("policies/", "past_answers/", "system_docs/", "operations/", "regulations/")
         for mapping in expected_routing_map.values():
             for src in mapping["assigned_sources"]:
                 assert any(src.startswith(p) for p in valid_prefixes), f"Invalid source: {src}"

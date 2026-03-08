@@ -31,7 +31,7 @@ class TestReader:
     def test_docx_files_readable(self, kb_dir: Path):
         """DOCXファイルが存在し、空でないこと。"""
         docx_files = list(kb_dir.rglob("*.docx"))
-        assert len(docx_files) == 4
+        assert len(docx_files) == 6
         for docx in docx_files:
             assert docx.stat().st_size > 0, f"{docx.name} is empty"
 

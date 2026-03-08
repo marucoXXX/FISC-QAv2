@@ -25,16 +25,16 @@ class TestE2EPipeline:
         assert (expected_dir / "final_answers.json").exists()
 
         kb_files = list(kb_dir.rglob("*"))
-        kb_file_count = sum(1 for f in kb_files if f.is_file())
-        assert kb_file_count == 12
+        kb_file_count = sum(1 for f in kb_files if f.is_file() and not f.name.startswith("."))
+        assert kb_file_count == 17
 
     def test_indexer_to_router_pipeline(self, questionnaire_path: Path, kb_dir: Path):
         """Indexer → Router の連携が正しく動作すること。"""
         questions = read_questionnaire(questionnaire_path)
-        assert len(questions) == 20
+        assert len(questions) == 30
 
         index = run_indexer(kb_dir)
-        assert len(index) == 12
+        assert len(index) == 17
 
         routing = run_router(questions, index)
         result = routing_to_dict(routing)

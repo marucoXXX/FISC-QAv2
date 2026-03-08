@@ -16,6 +16,14 @@
     ]
   },
   "3": {
+    "major": "セキュリティ管理",
+    "minor": "リスク管理",
+    "assigned_sources": [
+      "policies/security_policy.pdf",
+      "past_answers/past_answer_2024.xlsx"
+    ]
+  },
+  "4": {
     "major": "アクセス管理",
     "minor": "ユーザー認証",
     "assigned_sources": [
@@ -23,7 +31,7 @@
       "policies/security_policy.pdf"
     ]
   },
-  "4": {
+  "5": {
     "major": "アクセス管理",
     "minor": "権限管理",
     "assigned_sources": [
@@ -31,7 +39,7 @@
       "policies/security_policy.pdf"
     ]
   },
-  "5": {
+  "6": {
     "major": "アクセス管理",
     "minor": "特権アカウント",
     "assigned_sources": [
@@ -39,7 +47,7 @@
       "policies/security_policy.pdf"
     ]
   },
-  "6": {
+  "7": {
     "major": "ウイルス対策",
     "minor": "マルウェア対策",
     "assigned_sources": [
@@ -47,7 +55,7 @@
       "system_docs/operation_manual.pdf"
     ]
   },
-  "7": {
+  "8": {
     "major": "ウイルス対策",
     "minor": "不正プログラム",
     "assigned_sources": [
@@ -55,7 +63,7 @@
       "system_docs/operation_manual.pdf"
     ]
   },
-  "8": {
+  "9": {
     "major": "ネットワーク管理",
     "minor": "境界防御",
     "assigned_sources": [
@@ -63,7 +71,7 @@
       "policies/encryption_standards.pdf"
     ]
   },
-  "9": {
+  "10": {
     "major": "ネットワーク管理",
     "minor": "通信暗号化",
     "assigned_sources": [
@@ -71,7 +79,7 @@
       "policies/encryption_standards.pdf"
     ]
   },
-  "10": {
+  "11": {
     "major": "ネットワーク管理",
     "minor": "不正侵入検知",
     "assigned_sources": [
@@ -79,7 +87,7 @@
       "policies/encryption_standards.pdf"
     ]
   },
-  "11": {
+  "12": {
     "major": "バックアップ管理",
     "minor": "バックアップ",
     "assigned_sources": [
@@ -87,7 +95,7 @@
       "system_docs/infra_overview.pdf"
     ]
   },
-  "12": {
+  "13": {
     "major": "バックアップ管理",
     "minor": "復旧テスト",
     "assigned_sources": [
@@ -95,7 +103,7 @@
       "system_docs/infra_overview.pdf"
     ]
   },
-  "13": {
+  "14": {
     "major": "インシデント対応",
     "minor": "対応手順",
     "assigned_sources": [
@@ -103,7 +111,7 @@
       "system_docs/operation_manual.pdf"
     ]
   },
-  "14": {
+  "15": {
     "major": "インシデント対応",
     "minor": "報告体制",
     "assigned_sources": [
@@ -111,23 +119,31 @@
       "system_docs/operation_manual.pdf"
     ]
   },
-  "15": {
+  "16": {
+    "major": "インシデント対応",
+    "minor": "フォレンジック",
+    "assigned_sources": [
+      "system_docs/incident_response.docx",
+      "system_docs/operation_manual.pdf"
+    ]
+  },
+  "17": {
     "major": "変更管理",
     "minor": "変更手順",
     "assigned_sources": [
       "system_docs/operation_manual.pdf",
-      "system_docs/audit_compliance.docx"
+      "operations/change_management_log.xlsx"
     ]
   },
-  "16": {
+  "18": {
     "major": "変更管理",
     "minor": "脆弱性管理",
     "assigned_sources": [
       "system_docs/operation_manual.pdf",
-      "system_docs/audit_compliance.docx"
+      "operations/change_management_log.xlsx"
     ]
   },
-  "17": {
+  "19": {
     "major": "物理セキュリティ",
     "minor": "入退室管理",
     "assigned_sources": [
@@ -135,7 +151,7 @@
       "policies/security_policy.pdf"
     ]
   },
-  "18": {
+  "20": {
     "major": "物理セキュリティ",
     "minor": "設備管理",
     "assigned_sources": [
@@ -143,20 +159,84 @@
       "policies/security_policy.pdf"
     ]
   },
-  "19": {
+  "21": {
     "major": "教育・訓練",
     "minor": "セキュリティ教育",
     "assigned_sources": [
-      "system_docs/audit_compliance.docx",
-      "policies/security_policy.pdf"
+      "operations/security_training_record.docx",
+      "system_docs/audit_compliance.docx"
     ]
   },
-  "20": {
+  "22": {
     "major": "教育・訓練",
     "minor": "標的型攻撃訓練",
     "assigned_sources": [
-      "system_docs/audit_compliance.docx",
+      "operations/security_training_record.docx",
+      "system_docs/audit_compliance.docx"
+    ]
+  },
+  "23": {
+    "major": "外部委託管理",
+    "minor": "委託先評価",
+    "assigned_sources": [
+      "regulations/outsourcing_management.pdf",
+      "system_docs/audit_compliance.docx"
+    ]
+  },
+  "24": {
+    "major": "外部委託管理",
+    "minor": "契約管理",
+    "assigned_sources": [
+      "regulations/outsourcing_management.pdf",
+      "system_docs/audit_compliance.docx"
+    ]
+  },
+  "25": {
+    "major": "外部委託管理",
+    "minor": "再委託管理",
+    "assigned_sources": [
+      "regulations/outsourcing_management.pdf",
+      "system_docs/audit_compliance.docx"
+    ]
+  },
+  "26": {
+    "major": "システム開発",
+    "minor": "開発プロセス",
+    "assigned_sources": [
+      "regulations/system_development_standards.docx",
       "policies/security_policy.pdf"
+    ]
+  },
+  "27": {
+    "major": "システム開発",
+    "minor": "コード品質",
+    "assigned_sources": [
+      "regulations/system_development_standards.docx",
+      "policies/security_policy.pdf"
+    ]
+  },
+  "28": {
+    "major": "システム開発",
+    "minor": "脆弱性テスト",
+    "assigned_sources": [
+      "regulations/system_development_standards.docx",
+      "policies/security_policy.pdf"
+    ]
+  },
+  "29": {
+    "major": "ログ・監視",
+    "minor": "ログ管理",
+    "assigned_sources": [
+      "system_docs/operation_manual.pdf",
+      "operations/vulnerability_assessment_2024.pdf"
+    ]
+  },
+  "30": {
+    "major": "ログ・監視",
+    "minor": "リアルタイム監視",
+    "assigned_sources": [
+      "system_docs/operation_manual.pdf",
+      "operations/vulnerability_assessment_2024.pdf"
     ]
   }
 }

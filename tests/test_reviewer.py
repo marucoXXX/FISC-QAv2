@@ -16,7 +16,7 @@ class TestReviewer:
 
     def test_final_answers_structure(self, expected_final_answers: dict):
         """最終回答が正しい構造を持つこと。"""
-        assert len(expected_final_answers) == 20
+        assert len(expected_final_answers) == 30
         required_keys = {"question", "answer", "status", "evidence", "confidence", "needs_review"}
         for qno, ans in expected_final_answers.items():
             assert required_keys.issubset(ans.keys()), f"Missing keys in Q{qno}"

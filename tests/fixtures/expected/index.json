@@ -82,5 +82,40 @@
     "category": "system_docs",
     "summary": "[要約] operation_manual の内容",
     "estimated_tokens": 2000
+  },
+  {
+    "file_name": "change_management_log.xlsx",
+    "path": "tests/fixtures/kb/operations/change_management_log.xlsx",
+    "category": "operations",
+    "summary": "[要約] change_management_log の内容",
+    "estimated_tokens": 2000
+  },
+  {
+    "file_name": "security_training_record.docx",
+    "path": "tests/fixtures/kb/operations/security_training_record.docx",
+    "category": "operations",
+    "summary": "[要約] security_training_record の内容",
+    "estimated_tokens": 2000
+  },
+  {
+    "file_name": "vulnerability_assessment_2024.pdf",
+    "path": "tests/fixtures/kb/operations/vulnerability_assessment_2024.pdf",
+    "category": "operations",
+    "summary": "[要約] vulnerability_assessment_2024 の内容",
+    "estimated_tokens": 2000
+  },
+  {
+    "file_name": "outsourcing_management.pdf",
+    "path": "tests/fixtures/kb/regulations/outsourcing_management.pdf",
+    "category": "regulations",
+    "summary": "[要約] outsourcing_management の内容",
+    "estimated_tokens": 2000
+  },
+  {
+    "file_name": "system_development_standards.docx",
+    "path": "tests/fixtures/kb/regulations/system_development_standards.docx",
+    "category": "regulations",
+    "summary": "[要約] system_development_standards の内容",
+    "estimated_tokens": 2000
   }
 ]

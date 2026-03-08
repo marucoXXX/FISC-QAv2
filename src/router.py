@@ -17,9 +17,12 @@ _CATEGORY_HINTS: dict[str, list[str]] = {
     "ネットワーク管理": ["system_docs", "policies"],
     "バックアップ管理": ["system_docs"],
     "インシデント対応": ["system_docs"],
-    "変更管理": ["system_docs"],
+    "変更管理": ["system_docs", "operations"],
     "物理セキュリティ": ["system_docs", "policies"],
-    "教育・訓練": ["system_docs", "policies"],
+    "教育・訓練": ["operations", "system_docs"],
+    "外部委託管理": ["regulations", "system_docs"],
+    "システム開発": ["regulations", "policies"],
+    "ログ・監視": ["system_docs", "operations"],
 }
 
 # キーワードベースのファイルマッチング
@@ -30,9 +33,12 @@ _KEYWORD_MAP: dict[str, list[str]] = {
     "ネットワーク管理": ["infra_overview", "encryption_standards"],
     "バックアップ管理": ["dr_bcp_plan", "infra_overview"],
     "インシデント対応": ["incident_response", "operation_manual"],
-    "変更管理": ["operation_manual", "audit_compliance"],
+    "変更管理": ["operation_manual", "change_management_log"],
     "物理セキュリティ": ["infra_overview", "security_policy"],
-    "教育・訓練": ["audit_compliance", "security_policy"],
+    "教育・訓練": ["security_training_record", "audit_compliance"],
+    "外部委託管理": ["outsourcing_management", "audit_compliance"],
+    "システム開発": ["system_development_standards", "security_policy"],
+    "ログ・監視": ["operation_manual", "vulnerability_assessment"],
 }
 
 
