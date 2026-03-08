@@ -133,9 +133,8 @@ def _extract_summary(path: Path) -> tuple[str, int]:
 
 
 def _llm_summarize(text: str, file_name: str, api_key: str, model: str) -> str:
-    """Claude API を使って構造化サマリを生成する。"""
-    import anthropic
-    client = anthropic.Anthropic(api_key=api_key)
+    """LLM API を使って構造化サマリを生成する。"""
+    import litellm
     prompt = (
         f"以下はKBドキュメント「{file_name}」の先頭部分です。\n"
         "このドキュメントの内容を100〜200トークン程度で要約してください。\n"
@@ -145,12 +144,13 @@ def _llm_summarize(text: str, file_name: str, api_key: str, model: str) -> str:
         "- FISC安全対策基準との関連性（あれば）\n\n"
         f"```\n{text[:3000]}\n```"
     )
-    response = client.messages.create(
+    response = litellm.completion(
         model=model,
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
+        api_key=api_key or None,
     )
-    return response.content[0].text.strip()
+    return response.choices[0].message.content.strip()
 
 
 def _file_modified_iso(path: Path) -> str:
@@ -181,7 +181,7 @@ def run_indexer(
 
     entries: list[IndexEntry] = []
     for f in sorted(kb_dir.rglob("*")):
-        if not f.is_file():
+        if not f.is_file() or f.name.startswith("."):
             continue
         summary, tokens = _extract_summary(f)
         last_modified = _file_modified_iso(f)

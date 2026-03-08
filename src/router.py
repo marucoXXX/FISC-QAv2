@@ -146,16 +146,16 @@ def _llm_route(
     model: str,
 ) -> list[tuple[Question, list[IndexEntry]]]:
     """LLM ベースの動的ルーティング。"""
-    import anthropic
-    client = anthropic.Anthropic(api_key=api_key)
+    import litellm
     prompt = _build_llm_routing_prompt(questions, index)
 
-    response = client.messages.create(
+    response = litellm.completion(
         model=model,
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
+        api_key=api_key or None,
     )
-    response_text = response.content[0].text
+    response_text = response.choices[0].message.content
 
     qno_to_files = _parse_llm_routing_response(response_text, questions, index)
     index_by_name = {e.file_name: e for e in index}

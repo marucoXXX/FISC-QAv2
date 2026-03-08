@@ -35,10 +35,10 @@ class TestReader:
         for docx in docx_files:
             assert docx.stat().st_size > 0, f"{docx.name} is empty"
 
-    def test_past_answers_readable(self, kb_dir: Path):
-        """過去回答Excelが存在すること。"""
-        past = list((kb_dir / "past_answers").glob("*.xlsx"))
-        assert len(past) == 2
+    def test_past_answers_dir_absent(self, kb_dir: Path):
+        """過去回答ディレクトリが存在しない（削除済み）こと。"""
+        past_dir = kb_dir / "past_answers"
+        assert not past_dir.exists() or len(list(past_dir.glob("*.xlsx"))) == 0
 
     def test_read_docx_content(self, kb_dir: Path):
         """DOCXファイルの内容を読み取れること。"""
@@ -49,10 +49,9 @@ class TestReader:
 
     def test_read_xlsx_content(self, kb_dir: Path):
         """Excelファイルの内容を読み取れること。"""
-        xlsx_path = kb_dir / "past_answers" / "past_answer_2024.xlsx"
+        xlsx_path = kb_dir / "operations" / "change_management_log.xlsx"
         content = _read_file_content(xlsx_path)
         assert len(content) > 0
-        assert "Q001" in content or "実施" in content
 
     def test_parse_reader_response_valid(self):
         """正常なJSON応答をパースできること。"""
@@ -94,18 +93,18 @@ class TestReaderMock:
         ]
 
     @pytest.fixture
-    def mock_api_response(self):
-        """正常な API 応答を返す mock を構築するヘルパー。"""
+    def mock_llm_response(self):
+        """正常な LLM 応答を返す mock を構築するヘルパー。"""
         def _make(text: str):
-            content_block = MagicMock()
-            content_block.text = text
+            mock_choice = MagicMock()
+            mock_choice.message.content = text
             response = MagicMock()
-            response.content = [content_block]
+            response.choices = [mock_choice]
             return response
         return _make
 
-    @patch("src.reader.anthropic.Anthropic")
-    def test_run_reader_normal(self, mock_cls, sample_questions, mock_api_response, kb_dir):
+    @patch("src.reader.litellm.completion")
+    def test_run_reader_normal(self, mock_completion, sample_questions, mock_llm_response, kb_dir):
         """正常な API 応答で回答が生成されること。"""
         response_json = json.dumps([
             {
@@ -125,8 +124,7 @@ class TestReaderMock:
                 "key_excerpt": "TLS 1.3 による暗号化通信",
             },
         ])
-        mock_client = mock_cls.return_value
-        mock_client.messages.create.return_value = mock_api_response(response_json)
+        mock_completion.return_value = mock_llm_response(response_json)
 
         answers = run_reader(
             reader_id="test",
@@ -140,13 +138,12 @@ class TestReaderMock:
         assert answers[0].answer == "はい、全社的に MFA を導入済みです"
         assert answers[0].confidence == "high"
         assert answers[1].question_no == 2
-        mock_client.messages.create.assert_called_once()
+        mock_completion.assert_called_once()
 
-    @patch("src.reader.anthropic.Anthropic")
-    def test_run_reader_api_error(self, mock_cls, sample_questions, kb_dir):
+    @patch("src.reader.litellm.completion")
+    def test_run_reader_api_error(self, mock_completion, sample_questions, kb_dir):
         """API エラー時に例外が伝播すること（Orchestrator がリトライを担当）。"""
-        mock_client = mock_cls.return_value
-        mock_client.messages.create.side_effect = Exception("API rate limit exceeded")
+        mock_completion.side_effect = Exception("API rate limit exceeded")
 
         with pytest.raises(Exception, match="API rate limit"):
             run_reader(
@@ -157,11 +154,10 @@ class TestReaderMock:
                 api_key="fake-key",
             )
 
-    @patch("src.reader.anthropic.Anthropic")
-    def test_run_reader_invalid_json(self, mock_cls, sample_questions, mock_api_response, kb_dir):
+    @patch("src.reader.litellm.completion")
+    def test_run_reader_invalid_json(self, mock_completion, sample_questions, mock_llm_response, kb_dir):
         """API が不正 JSON を返した場合、全質問に LOW confidence の回答を返すこと。"""
-        mock_client = mock_cls.return_value
-        mock_client.messages.create.return_value = mock_api_response("これはJSONではありません")
+        mock_completion.return_value = mock_llm_response("これはJSONではありません")
 
         answers = run_reader(
             reader_id="test",

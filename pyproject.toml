@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "FISC アンケート自動回答マルチエージェントシステム"
 requires-python = ">=3.9"
 dependencies = [
-    "anthropic>=0.20",
+    "litellm>=1.30",
     "openpyxl>=3.1",
     "python-docx>=0.8",
 ]

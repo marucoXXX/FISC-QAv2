@@ -23,7 +23,7 @@ class TestIndexer:
         """KBディレクトリにファイルが存在すること。"""
         all_files = list(kb_dir.rglob("*"))
         files = [f for f in all_files if f.is_file() and not f.name.startswith(".")]
-        assert len(files) == 17, f"KB には17ファイル期待、実際は {len(files)}"
+        assert len(files) == 15, f"KB には15ファイル期待、実際は {len(files)}"
 
     def test_expected_index_structure(self, expected_index: list[dict]):
         """期待出力のインデックスが正しい構造を持つこと。"""
@@ -34,14 +34,14 @@ class TestIndexer:
 
     def test_index_covers_all_kb_files(self, expected_index: list[dict], kb_dir: Path):
         """インデックスがすべてのKBファイルをカバーすること。"""
-        kb_files = {f.name for f in kb_dir.rglob("*") if f.is_file()}
+        kb_files = {f.name for f in kb_dir.rglob("*") if f.is_file() and not f.name.startswith(".")}
         indexed_files = {entry["file_name"] for entry in expected_index}
         assert kb_files == indexed_files
 
     def test_indexer_run(self, kb_dir: Path):
         """Indexer を実行してインデックスを生成する。"""
         result = run_indexer(kb_dir)
-        assert len(result) == 17
+        assert len(result) == 15
         dicts = index_to_dicts(result)
         required_keys = {"file_name", "path", "category", "summary", "estimated_tokens"}
         for entry in dicts:
@@ -94,33 +94,34 @@ class TestLlmSummary:
 
     def test_llm_summarize_called(self):
         """LLM 要約が正しくAPIを呼び出すこと。"""
+        mock_choice = MagicMock()
+        mock_choice.message.content = "LLMによる要約テキスト"
         mock_response = MagicMock()
-        mock_response.content = [MagicMock(text="LLMによる要約テキスト")]
-        with patch("anthropic.Anthropic") as mock_cls:
-            mock_client = mock_cls.return_value
-            mock_client.messages.create.return_value = mock_response
+        mock_response.choices = [mock_choice]
+        with patch("litellm.completion") as mock_completion:
+            mock_completion.return_value = mock_response
             result = _llm_summarize("テスト本文", "test.pdf", "fake-key", "claude-sonnet-4-20250514")
         assert result == "LLMによる要約テキスト"
-        mock_client.messages.create.assert_called_once()
+        mock_completion.assert_called_once()
 
     def test_run_indexer_with_llm_summary(self, kb_dir: Path):
         """use_llm_summary=True でLLM要約が適用されること。"""
+        mock_choice = MagicMock()
+        mock_choice.message.content = "LLM生成サマリ"
         mock_response = MagicMock()
-        mock_response.content = [MagicMock(text="LLM生成サマリ")]
-        with patch("anthropic.Anthropic") as mock_cls:
-            mock_client = mock_cls.return_value
-            mock_client.messages.create.return_value = mock_response
+        mock_response.choices = [mock_choice]
+        with patch("litellm.completion") as mock_completion:
+            mock_completion.return_value = mock_response
             result = run_indexer(kb_dir, api_key="fake-key", use_llm_summary=True)
         # 全ファイルの要約がLLM生成に置き換わっていること
         for entry in result:
             assert entry.summary == "LLM生成サマリ"
-        assert mock_client.messages.create.call_count == 17
+        assert mock_completion.call_count == 15
 
     def test_run_indexer_llm_failure_fallback(self, kb_dir: Path):
         """LLM呼び出し失敗時にローカル要約にフォールバックすること。"""
-        with patch("anthropic.Anthropic") as mock_cls:
-            mock_client = mock_cls.return_value
-            mock_client.messages.create.side_effect = Exception("API error")
+        with patch("litellm.completion") as mock_completion:
+            mock_completion.side_effect = Exception("API error")
             result = run_indexer(kb_dir, api_key="fake-key", use_llm_summary=True)
         # フォールバック: 全ファイルがローカル要約を持つこと
         for entry in result:

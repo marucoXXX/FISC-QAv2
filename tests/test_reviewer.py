@@ -79,8 +79,8 @@ class TestReviewerMock:
         }
         return questions, answers
 
-    @patch("src.reviewer.anthropic.Anthropic")
-    def test_run_reviewer_normal(self, mock_cls, sample_qa):
+    @patch("src.reviewer.litellm.completion")
+    def test_run_reviewer_normal(self, mock_completion, sample_qa):
         """正常なレビュー応答で判定が適用されること。"""
         questions, answers = sample_qa
 
@@ -100,11 +100,11 @@ class TestReviewerMock:
             ],
         })
 
-        content_block = MagicMock()
-        content_block.text = review_json
-        response = MagicMock()
-        response.content = [content_block]
-        mock_cls.return_value.messages.create.return_value = response
+        mock_choice = MagicMock()
+        mock_choice.message.content = review_json
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_completion.return_value = mock_response
 
         final, notes = run_reviewer(questions, answers, api_key="fake-key")
 
@@ -112,16 +112,16 @@ class TestReviewerMock:
         assert len(notes) == 1
         assert notes[0].issue_type == "weak_reference"
 
-    @patch("src.reviewer.anthropic.Anthropic")
-    def test_run_reviewer_parse_failure_fallback(self, mock_cls, sample_qa):
+    @patch("src.reviewer.litellm.completion")
+    def test_run_reviewer_parse_failure_fallback(self, mock_completion, sample_qa):
         """API が不正 JSON を返した場合、ルールベースレビューにフォールバックすること。"""
         questions, answers = sample_qa
 
-        content_block = MagicMock()
-        content_block.text = "これはJSONではありません"
-        response = MagicMock()
-        response.content = [content_block]
-        mock_cls.return_value.messages.create.return_value = response
+        mock_choice = MagicMock()
+        mock_choice.message.content = "これはJSONではありません"
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_completion.return_value = mock_response
 
         final, notes = run_reviewer(questions, answers, api_key="fake-key")
 

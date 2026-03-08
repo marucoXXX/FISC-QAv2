@@ -137,11 +137,12 @@ class TestLlmRouter:
                 for q in questions
             ]
         }
+        mock_choice = MagicMock()
+        mock_choice.message.content = json.dumps(routing_data)
         mock_response = MagicMock()
-        mock_response.content = [MagicMock(text=json.dumps(routing_data))]
-        with patch("anthropic.Anthropic") as mock_cls:
-            mock_client = mock_cls.return_value
-            mock_client.messages.create.return_value = mock_response
+        mock_response.choices = [mock_choice]
+        with patch("litellm.completion") as mock_completion:
+            mock_completion.return_value = mock_response
             result = run_router(questions, index, api_key="fake-key")
 
         result_dict = routing_to_dict(result)
@@ -149,16 +150,15 @@ class TestLlmRouter:
         for reader in result_dict["readers"]:
             all_assigned.update(reader["questions"])
         assert all_assigned == {q.no for q in questions}
-        mock_client.messages.create.assert_called_once()
+        mock_completion.assert_called_once()
 
     def test_run_router_llm_failure_fallback(self, questionnaire_path: Path, kb_dir: Path):
         """LLM 失敗時に静的ルーティングにフォールバックすること。"""
         questions = read_questionnaire(questionnaire_path)
         index = run_indexer(kb_dir)
 
-        with patch("anthropic.Anthropic") as mock_cls:
-            mock_client = mock_cls.return_value
-            mock_client.messages.create.side_effect = Exception("API error")
+        with patch("litellm.completion") as mock_completion:
+            mock_completion.side_effect = Exception("API error")
             result = run_router(questions, index, api_key="fake-key")
 
         # フォールバック: 全質問が割り当てられていること
@@ -174,9 +174,9 @@ class TestLlmRouter:
         index = run_indexer(kb_dir)
 
         # api_key なしで呼び出し — LLM は呼ばれないはず
-        with patch("anthropic.Anthropic") as mock_cls:
+        with patch("litellm.completion") as mock_completion:
             result = run_router(questions, index)
-            mock_cls.assert_not_called()
+            mock_completion.assert_not_called()
 
         result_dict = routing_to_dict(result)
         all_assigned = set()

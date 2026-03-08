@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-import anthropic
+import litellm
 
 from .models import Answer, Confidence, Question, ReviewNote
 
@@ -76,15 +76,17 @@ def run_reviewer(
 ) -> tuple[dict[int, Answer], list[ReviewNote]]:
     user_prompt = _build_review_prompt(questions, answers)
 
-    client = anthropic.Anthropic(api_key=api_key)
-    response = client.messages.create(
+    response = litellm.completion(
         model=model,
         max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+        api_key=api_key or None,
     )
 
-    response_text = response.content[0].text
+    response_text = response.choices[0].message.content
     return _apply_review(answers, response_text)
 
 

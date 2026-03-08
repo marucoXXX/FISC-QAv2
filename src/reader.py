@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import anthropic
+import litellm
 
 from .models import Answer, Confidence, Question
 
@@ -98,15 +98,17 @@ def run_reader(
 
     user_prompt = _build_user_prompt(questions, file_contents)
 
-    client = anthropic.Anthropic(api_key=api_key)
-    response = client.messages.create(
+    response = litellm.completion(
         model=model,
         max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+        api_key=api_key or None,
     )
 
-    response_text = response.content[0].text
+    response_text = response.choices[0].message.content
     return _parse_reader_response(response_text, questions)
 
 

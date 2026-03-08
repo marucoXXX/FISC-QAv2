@@ -35,20 +35,6 @@
     "estimated_tokens": 2000
   },
   {
-    "file_name": "past_answer_2023.xlsx",
-    "path": "tests/fixtures/kb/past_answers/past_answer_2023.xlsx",
-    "category": "past_answers",
-    "summary": "[要約] past_answer_2023 の内容",
-    "estimated_tokens": 2000
-  },
-  {
-    "file_name": "past_answer_2024.xlsx",
-    "path": "tests/fixtures/kb/past_answers/past_answer_2024.xlsx",
-    "category": "past_answers",
-    "summary": "[要約] past_answer_2024 の内容",
-    "estimated_tokens": 2000
-  },
-  {
     "file_name": "audit_compliance.docx",
     "path": "tests/fixtures/kb/system_docs/audit_compliance.docx",
     "category": "system_docs",
