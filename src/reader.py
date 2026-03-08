@@ -116,6 +116,17 @@ def _parse_reader_response(text: str, questions: list[Question]) -> list[Answer]
     # Extract JSON from response (handle markdown code blocks)
     json_text = text.strip()
     if "```" in json_text:
+        # Extract content between first ``` and last ```
+        parts = json_text.split("```")
+        for part in parts[1::2]:  # odd-indexed parts are inside code blocks
+            stripped = part.strip()
+            if stripped.startswith("json"):
+                stripped = stripped[4:].strip()
+            if stripped.startswith("["):
+                json_text = stripped
+                break
+    else:
+        # No code blocks — try to find JSON array directly
         start = json_text.find("[")
         end = json_text.rfind("]") + 1
         if start >= 0 and end > start:
@@ -124,6 +135,8 @@ def _parse_reader_response(text: str, questions: list[Question]) -> list[Answer]
     try:
         data = json.loads(json_text)
     except json.JSONDecodeError:
+        import sys
+        print(f"[Reader] JSON parse failed. Raw response (first 500 chars):\n{text[:500]}", file=sys.stderr)
         # If parsing fails, return low-confidence answers for all questions
         return [
             Answer(

@@ -97,6 +97,15 @@ def _apply_review(
     # Parse review response
     json_text = review_text.strip()
     if "```" in json_text:
+        parts = json_text.split("```")
+        for part in parts[1::2]:  # odd-indexed parts are inside code blocks
+            stripped = part.strip()
+            if stripped.startswith("json"):
+                stripped = stripped[4:].strip()
+            if stripped.startswith("{"):
+                json_text = stripped
+                break
+    else:
         start = json_text.find("{")
         end = json_text.rfind("}") + 1
         if start >= 0 and end > start:
