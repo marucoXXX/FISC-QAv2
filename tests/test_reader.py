@@ -35,10 +35,11 @@ class TestReader:
         for docx in docx_files:
             assert docx.stat().st_size > 0, f"{docx.name} is empty"
 
-    def test_past_answers_dir_absent(self, kb_dir: Path):
-        """過去回答ディレクトリが存在しない（削除済み）こと。"""
+    def test_past_answers_dir_present(self, kb_dir: Path):
+        """過去回答ディレクトリに過去回答ファイルが存在すること。"""
         past_dir = kb_dir / "past_answers"
-        assert not past_dir.exists() or len(list(past_dir.glob("*.xlsx"))) == 0
+        xlsx_files = list(past_dir.glob("*.xlsx"))
+        assert len(xlsx_files) == 2
 
     def test_read_docx_content(self, kb_dir: Path):
         """DOCXファイルの内容を読み取れること。"""

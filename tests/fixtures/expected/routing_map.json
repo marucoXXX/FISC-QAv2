@@ -3,21 +3,24 @@
     "major": "セキュリティ管理",
     "minor": "ポリシー管理",
     "assigned_sources": [
-      "policies/security_policy.pdf"
+      "policies/security_policy.pdf",
+      "past_answers/past_answer_2024.xlsx"
     ]
   },
   "2": {
     "major": "セキュリティ管理",
     "minor": "組織体制",
     "assigned_sources": [
-      "policies/security_policy.pdf"
+      "policies/security_policy.pdf",
+      "past_answers/past_answer_2024.xlsx"
     ]
   },
   "3": {
     "major": "セキュリティ管理",
     "minor": "リスク管理",
     "assigned_sources": [
-      "policies/security_policy.pdf"
+      "policies/security_policy.pdf",
+      "past_answers/past_answer_2024.xlsx"
     ]
   },
   "4": {

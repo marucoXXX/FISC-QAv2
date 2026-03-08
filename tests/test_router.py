@@ -66,7 +66,7 @@ class TestRouter:
         """小さいトークン予算で複数Readerに分割されること。"""
         questions = read_questionnaire(questionnaire_path)
         index = run_indexer(kb_dir)
-        budget = 20000
+        budget = 5000
         result = run_router(questions, index, token_budget_per_reader=budget)
         # 小さい予算なので複数Readerに分割されるはず
         assert len(result.readers) > 1

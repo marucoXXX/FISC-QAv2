@@ -66,7 +66,7 @@ def _find_related_files(
     for entry in index_dicts:
         stem = entry["file_name"].rsplit(".", 1)[0]
         if any(kw in stem for kw in keywords):
-            related.append(entry["file_name"])
+            related.append(entry["path"])
     return related
 
 
@@ -179,15 +179,15 @@ def run_pipeline(
     routing_map: dict[int, list[str]] = {}
     for reader in pre_routing.readers:
         for qno in reader.questions:
-            file_names = [
-                entry.file_name for entry in index_entries
-                if str(entry.path) in reader.files or entry.path in reader.files
+            file_paths = [
+                entry.path for entry in index_entries
+                if entry.path in reader.files
             ]
             if qno not in routing_map:
                 routing_map[qno] = []
-            for fn in file_names:
-                if fn not in routing_map[qno]:
-                    routing_map[qno].append(fn)
+            for fp in file_paths:
+                if fp not in routing_map[qno]:
+                    routing_map[qno].append(fp)
 
     past_answers = _load_past_answers(kb_dir)
     reused: dict[int, Answer] = {}
@@ -198,7 +198,7 @@ def run_pipeline(
         all_unchanged = all(
             not entry.updated
             for entry in index_entries
-            if entry.file_name in related_files
+            if entry.path in related_files
         )
         qid = f"Q{q.no:03d}"
         if all_unchanged and qid in past_answers:

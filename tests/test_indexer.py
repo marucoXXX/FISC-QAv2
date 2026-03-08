@@ -23,7 +23,7 @@ class TestIndexer:
         """KBディレクトリにファイルが存在すること。"""
         all_files = list(kb_dir.rglob("*"))
         files = [f for f in all_files if f.is_file() and not f.name.startswith(".")]
-        assert len(files) == 15, f"KB には15ファイル期待、実際は {len(files)}"
+        assert len(files) == 17, f"KB には17ファイル期待、実際は {len(files)}"
 
     def test_expected_index_structure(self, expected_index: list[dict]):
         """期待出力のインデックスが正しい構造を持つこと。"""
@@ -41,7 +41,7 @@ class TestIndexer:
     def test_indexer_run(self, kb_dir: Path):
         """Indexer を実行してインデックスを生成する。"""
         result = run_indexer(kb_dir)
-        assert len(result) == 15
+        assert len(result) == 17
         dicts = index_to_dicts(result)
         required_keys = {"file_name", "path", "category", "summary", "estimated_tokens"}
         for entry in dicts:
@@ -116,7 +116,7 @@ class TestLlmSummary:
         # 全ファイルの要約がLLM生成に置き換わっていること
         for entry in result:
             assert entry.summary == "LLM生成サマリ"
-        assert mock_completion.call_count == 15
+        assert mock_completion.call_count == 17
 
     def test_run_indexer_llm_failure_fallback(self, kb_dir: Path):
         """LLM呼び出し失敗時にローカル要約にフォールバックすること。"""

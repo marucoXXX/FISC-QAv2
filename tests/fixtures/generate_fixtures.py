@@ -61,11 +61,15 @@ _JP_FONT_NAME = "IPAGothic"
 _JP_FONT_REGISTERED = False
 
 _CANDIDATE_FONTS = [
-    "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
-    "/System/Library/Fonts/Hiragino Sans GB W3.otf",
-    "/System/Library/Fonts/HelveticaNeue.ttc",
+    # macOS — TrueType outlines (CFF/PostScript outlines in TTC are unsupported by ReportLab)
+    "/Library/Fonts/Arial Unicode.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/System/Library/Fonts/Supplemental/NotoSansGothic-Regular.ttf",
+    "/System/Library/Fonts/Supplemental/AppleGothic.ttf",
+    # Linux
     "/usr/share/fonts/truetype/ipafont-gothic/ipag.ttf",
     "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
 ]
 
 
@@ -78,7 +82,10 @@ def _register_jp_font() -> str:
         p = Path(fp)
         if p.exists():
             try:
-                pdfmetrics.registerFont(TTFont(_JP_FONT_NAME, str(p)))
+                if fp.endswith(".ttc"):
+                    pdfmetrics.registerFont(TTFont(_JP_FONT_NAME, str(p), subfontIndex=0))
+                else:
+                    pdfmetrics.registerFont(TTFont(_JP_FONT_NAME, str(p)))
                 _JP_FONT_REGISTERED = True
                 return _JP_FONT_NAME
             except Exception:
@@ -232,7 +239,7 @@ def _generate_expected_outputs():
                 if f.is_file():
                     kb_files.append({
                         "file_name": f.name,
-                        "path": f"tests/fixtures/kb/{subdir}/{f.name}",
+                        "path": f"{subdir}/{f.name}",
                         "category": subdir,
                         "summary": f"[要約] {f.stem} の内容",
                         "estimated_tokens": 2000,

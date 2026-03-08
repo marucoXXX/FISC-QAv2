@@ -199,7 +199,7 @@ def run_indexer(
         category = _category_from_path(f, kb_dir)
         entries.append(IndexEntry(
             file_name=f.name,
-            path=str(f.relative_to(kb_dir.parent.parent) if "fixtures" in str(kb_dir) else f),
+            path=str(f.relative_to(kb_dir)),
             category=category,
             summary=summary,
             estimated_tokens=tokens,

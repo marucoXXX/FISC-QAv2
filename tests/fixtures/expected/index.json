@@ -1,107 +1,121 @@
 [
   {
     "file_name": "access_control_policy.pdf",
-    "path": "tests/fixtures/kb/policies/access_control_policy.pdf",
+    "path": "policies/access_control_policy.pdf",
     "category": "policies",
     "summary": "[要約] access_control_policy の内容",
     "estimated_tokens": 2000
   },
   {
-    "file_name": "data_protection_policy.docx",
-    "path": "tests/fixtures/kb/policies/data_protection_policy.docx",
-    "category": "policies",
-    "summary": "[要約] data_protection_policy の内容",
-    "estimated_tokens": 2000
-  },
-  {
-    "file_name": "encryption_standards.pdf",
-    "path": "tests/fixtures/kb/policies/encryption_standards.pdf",
-    "category": "policies",
-    "summary": "[要約] encryption_standards の内容",
-    "estimated_tokens": 2000
-  },
-  {
-    "file_name": "remote_access_policy.docx",
-    "path": "tests/fixtures/kb/policies/remote_access_policy.docx",
-    "category": "policies",
-    "summary": "[要約] remote_access_policy の内容",
-    "estimated_tokens": 2000
-  },
-  {
-    "file_name": "security_policy.pdf",
-    "path": "tests/fixtures/kb/policies/security_policy.pdf",
-    "category": "policies",
-    "summary": "[要約] security_policy の内容",
-    "estimated_tokens": 2000
-  },
-  {
     "file_name": "audit_compliance.docx",
-    "path": "tests/fixtures/kb/system_docs/audit_compliance.docx",
+    "path": "system_docs/audit_compliance.docx",
     "category": "system_docs",
     "summary": "[要約] audit_compliance の内容",
     "estimated_tokens": 2000
   },
   {
+    "file_name": "change_management_log.xlsx",
+    "path": "operations/change_management_log.xlsx",
+    "category": "operations",
+    "summary": "[要約] change_management_log の内容",
+    "estimated_tokens": 2000
+  },
+  {
+    "file_name": "data_protection_policy.docx",
+    "path": "policies/data_protection_policy.docx",
+    "category": "policies",
+    "summary": "[要約] data_protection_policy の内容",
+    "estimated_tokens": 2000
+  },
+  {
     "file_name": "dr_bcp_plan.pdf",
-    "path": "tests/fixtures/kb/system_docs/dr_bcp_plan.pdf",
+    "path": "system_docs/dr_bcp_plan.pdf",
     "category": "system_docs",
     "summary": "[要約] dr_bcp_plan の内容",
     "estimated_tokens": 2000
   },
   {
+    "file_name": "encryption_standards.pdf",
+    "path": "policies/encryption_standards.pdf",
+    "category": "policies",
+    "summary": "[要約] encryption_standards の内容",
+    "estimated_tokens": 2000
+  },
+  {
     "file_name": "incident_response.docx",
-    "path": "tests/fixtures/kb/system_docs/incident_response.docx",
+    "path": "system_docs/incident_response.docx",
     "category": "system_docs",
     "summary": "[要約] incident_response の内容",
     "estimated_tokens": 2000
   },
   {
     "file_name": "infra_overview.pdf",
-    "path": "tests/fixtures/kb/system_docs/infra_overview.pdf",
+    "path": "system_docs/infra_overview.pdf",
     "category": "system_docs",
     "summary": "[要約] infra_overview の内容",
     "estimated_tokens": 2000
   },
   {
     "file_name": "operation_manual.pdf",
-    "path": "tests/fixtures/kb/system_docs/operation_manual.pdf",
+    "path": "system_docs/operation_manual.pdf",
     "category": "system_docs",
     "summary": "[要約] operation_manual の内容",
     "estimated_tokens": 2000
   },
   {
-    "file_name": "change_management_log.xlsx",
-    "path": "tests/fixtures/kb/operations/change_management_log.xlsx",
-    "category": "operations",
-    "summary": "[要約] change_management_log の内容",
-    "estimated_tokens": 2000
-  },
-  {
-    "file_name": "security_training_record.docx",
-    "path": "tests/fixtures/kb/operations/security_training_record.docx",
-    "category": "operations",
-    "summary": "[要約] security_training_record の内容",
-    "estimated_tokens": 2000
-  },
-  {
-    "file_name": "vulnerability_assessment_2024.pdf",
-    "path": "tests/fixtures/kb/operations/vulnerability_assessment_2024.pdf",
-    "category": "operations",
-    "summary": "[要約] vulnerability_assessment_2024 の内容",
-    "estimated_tokens": 2000
-  },
-  {
     "file_name": "outsourcing_management.pdf",
-    "path": "tests/fixtures/kb/regulations/outsourcing_management.pdf",
+    "path": "regulations/outsourcing_management.pdf",
     "category": "regulations",
     "summary": "[要約] outsourcing_management の内容",
     "estimated_tokens": 2000
   },
   {
+    "file_name": "past_answer_2023.xlsx",
+    "path": "past_answers/past_answer_2023.xlsx",
+    "category": "past_answers",
+    "summary": "[要約] past_answer_2023 の内容",
+    "estimated_tokens": 2000
+  },
+  {
+    "file_name": "past_answer_2024.xlsx",
+    "path": "past_answers/past_answer_2024.xlsx",
+    "category": "past_answers",
+    "summary": "[要約] past_answer_2024 の内容",
+    "estimated_tokens": 2000
+  },
+  {
+    "file_name": "remote_access_policy.docx",
+    "path": "policies/remote_access_policy.docx",
+    "category": "policies",
+    "summary": "[要約] remote_access_policy の内容",
+    "estimated_tokens": 2000
+  },
+  {
+    "file_name": "security_policy.pdf",
+    "path": "policies/security_policy.pdf",
+    "category": "policies",
+    "summary": "[要約] security_policy の内容",
+    "estimated_tokens": 2000
+  },
+  {
+    "file_name": "security_training_record.docx",
+    "path": "operations/security_training_record.docx",
+    "category": "operations",
+    "summary": "[要約] security_training_record の内容",
+    "estimated_tokens": 2000
+  },
+  {
     "file_name": "system_development_standards.docx",
-    "path": "tests/fixtures/kb/regulations/system_development_standards.docx",
+    "path": "regulations/system_development_standards.docx",
     "category": "regulations",
     "summary": "[要約] system_development_standards の内容",
+    "estimated_tokens": 2000
+  },
+  {
+    "file_name": "vulnerability_assessment_2024.pdf",
+    "path": "operations/vulnerability_assessment_2024.pdf",
+    "category": "operations",
+    "summary": "[要約] vulnerability_assessment_2024 の内容",
     "estimated_tokens": 2000
   }
 ]

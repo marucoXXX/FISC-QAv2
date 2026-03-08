@@ -26,7 +26,7 @@ class TestE2EPipeline:
 
         kb_files = list(kb_dir.rglob("*"))
         kb_file_count = sum(1 for f in kb_files if f.is_file() and not f.name.startswith("."))
-        assert kb_file_count == 15
+        assert kb_file_count == 17
 
     def test_indexer_to_router_pipeline(self, questionnaire_path: Path, kb_dir: Path):
         """Indexer → Router の連携が正しく動作すること。"""
