@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 
 import litellm
 
 from .models import Answer, Confidence, Question, ReviewNote
+from .reader import _is_openai_model
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
 あなたはFISCアンケート回答の品質レビュー担当者です。
@@ -38,6 +42,27 @@ SYSTEM_PROMPT = """\
   ]
 }
 """
+
+
+def _extract_json_object(text: str) -> str:
+    """LLM応答テキストからJSONオブジェクト部分を抽出する。"""
+    from .reader import _find_matching_bracket
+
+    raw = text.strip()
+    # 1) コードブロック内を探す
+    if "```" in raw:
+        parts = raw.split("```")
+        for part in parts[1::2]:
+            stripped = part.strip()
+            if stripped.startswith("json"):
+                stripped = stripped[4:].strip()
+            if stripped.startswith("{") or stripped.startswith("["):
+                return stripped
+    # 2) フォールバック: 生テキストから { ... } を括弧深度マッチングで探す
+    start, end = _find_matching_bracket(raw, "{", "}")
+    if start >= 0:
+        return raw[start:end]
+    return raw
 
 
 def _build_review_prompt(
@@ -76,17 +101,32 @@ def run_reviewer(
 ) -> tuple[dict[int, Answer], list[ReviewNote]]:
     user_prompt = _build_review_prompt(questions, answers)
 
-    response = litellm.completion(
+    kwargs: dict = dict(
         model=model,
-        max_tokens=4096,
+        max_tokens=8192,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ],
         api_key=api_key or None,
     )
+    if _is_openai_model(model):
+        kwargs["response_format"] = {"type": "json_object"}
 
-    response_text = response.choices[0].message.content
+    response = litellm.completion(**kwargs)
+
+    choice = response.choices[0]
+    finish_reason = getattr(choice, "finish_reason", None)
+    response_text = choice.message.content
+
+    if not response_text:
+        logger.warning("[Reviewer] Empty response, using rule-based fallback")
+        return _rule_based_review(answers), []
+
+    if finish_reason == "length":
+        logger.warning("[Reviewer] Response truncated (finish_reason=length), using rule-based fallback")
+        return _rule_based_review(answers), []
+
     return _apply_review(answers, response_text)
 
 
@@ -95,28 +135,23 @@ def _apply_review(
     review_text: str,
 ) -> tuple[dict[int, Answer], list[ReviewNote]]:
     # Parse review response
-    json_text = review_text.strip()
-    if "```" in json_text:
-        parts = json_text.split("```")
-        for part in parts[1::2]:  # odd-indexed parts are inside code blocks
-            stripped = part.strip()
-            if stripped.startswith("json"):
-                stripped = stripped[4:].strip()
-            if stripped.startswith("{"):
-                json_text = stripped
-                break
-    else:
-        start = json_text.find("{")
-        end = json_text.rfind("}") + 1
-        if start >= 0 and end > start:
-            json_text = json_text[start:end]
-
     review_notes: list[ReviewNote] = []
+
+    # Step 1: 直接 json.loads を試行（response_format 対応）
+    data = None
     try:
-        data = json.loads(json_text)
-    except json.JSONDecodeError:
-        # If parsing fails, apply rule-based review only
-        return _rule_based_review(answers), review_notes
+        data = json.loads(review_text.strip())
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Step 2: 失敗時のみ _extract_json_object でフォールバック
+    if data is None:
+        json_text = _extract_json_object(review_text)
+        try:
+            data = json.loads(json_text)
+        except json.JSONDecodeError:
+            # If parsing fails, apply rule-based review only
+            return _rule_based_review(answers), review_notes
 
     # Apply overrides from LLM review
     for judgment in data.get("final_judgments", []):

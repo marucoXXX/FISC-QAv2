@@ -6,6 +6,7 @@ import json
 import logging
 
 from .models import IndexEntry, Question, ReaderAssignment, RoutingResult
+from .reader import _is_openai_model
 
 logger = logging.getLogger(__name__)
 
@@ -113,19 +114,34 @@ def _parse_llm_routing_response(
     index: list[IndexEntry],
 ) -> dict[int, list[str]]:
     """LLM レスポンスから質問→ファイル名リストのマッピングを解析する。"""
-    # JSON 部分を抽出
-    clean = text
-    if "```" in clean:
-        parts = clean.split("```")
-        for part in parts:
-            stripped = part.strip()
-            if stripped.startswith("json"):
-                stripped = stripped[4:].strip()
-            if stripped.startswith("{"):
-                clean = stripped
-                break
+    from .reader import _find_matching_bracket
 
-    data = json.loads(clean)
+    # Step 1: 直接 json.loads を試行（response_format 対応）
+    data = None
+    try:
+        data = json.loads(text.strip())
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Step 2: 失敗時のみ抽出を試行
+    if data is None:
+        clean = text.strip()
+        if "```" in clean:
+            parts = clean.split("```")
+            for part in parts[1::2]:  # odd-indexed parts are inside code blocks
+                stripped = part.strip()
+                if stripped.startswith("json"):
+                    stripped = stripped[4:].strip()
+                if stripped.startswith("{") or stripped.startswith("["):
+                    clean = stripped
+                    break
+        # フォールバック: 生テキストから { ... } を括弧深度マッチングで探す
+        if clean.find("```") >= 0 or not clean.startswith("{"):
+            start, end = _find_matching_bracket(clean, "{", "}")
+            if start >= 0:
+                clean = clean[start:end]
+
+        data = json.loads(clean)
     routing_list = data.get("routing", [])
 
     valid_files = {e.file_name for e in index}
@@ -149,13 +165,28 @@ def _llm_route(
     import litellm
     prompt = _build_llm_routing_prompt(questions, index)
 
-    response = litellm.completion(
+    kwargs: dict = dict(
         model=model,
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
         api_key=api_key or None,
     )
-    response_text = response.choices[0].message.content
+    if _is_openai_model(model):
+        kwargs["response_format"] = {"type": "json_object"}
+
+    response = litellm.completion(**kwargs)
+
+    choice = response.choices[0]
+    finish_reason = getattr(choice, "finish_reason", None)
+    response_text = choice.message.content
+
+    if not response_text:
+        logger.warning("[Router] Empty response, falling back to static routing")
+        return _static_route(questions, index)
+
+    if finish_reason == "length":
+        logger.warning("[Router] Response truncated (finish_reason=length), falling back to static routing")
+        return _static_route(questions, index)
 
     qno_to_files = _parse_llm_routing_response(response_text, questions, index)
     index_by_name = {e.file_name: e for e in index}
