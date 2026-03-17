@@ -1,0 +1,52 @@
+{
+  "project": {
+    "id": "izanagi",
+    "region": "asia-northeast1",
+    "url": "https://izanagi.an.r.appspot.com"
+  },
+  "gcp": {
+    "workload_identity_provider": "",
+    "service_account": "",
+    "storage_bucket": "izanagi-files"
+  },
+  "environments": {
+    "local": {
+      "frontend": {
+        "VITE_API_URL": "http://localhost:8000",
+        "VITE_AUTH_MOCK_MODE": "true"
+      },
+      "backend": {
+        "CORS_ORIGINS": "http://localhost:5173",
+        "DATASTORE_EMULATOR_HOST": "localhost:8081",
+        "GOOGLE_CLOUD_PROJECT": "izanagi-dev",
+        "AUTH_MOCK_MODE": "true",
+        "GCS_BUCKET": "izanagi-files-dev"
+      }
+    },
+    "prod": {
+      "frontend": {
+        "VITE_API_URL": "",
+        "VITE_AUTH_MOCK_MODE": "false",
+        "VITE_AZURE_REDIRECT_URI": "https://izanagi.an.r.appspot.com"
+      },
+      "backend": {
+        "CORS_ORIGINS": "https://izanagi.an.r.appspot.com",
+        "GOOGLE_CLOUD_PROJECT": "izanagi",
+        "AUTH_MOCK_MODE": "false",
+        "GCS_BUCKET": "izanagi-files"
+      }
+    }
+  },
+  "secrets": {
+    "frontend": [
+      "VITE_AZURE_CLIENT_ID",
+      "VITE_AZURE_TENANT_ID"
+    ],
+    "backend": [
+      "OPENAI_API_KEY",
+      "AZURE_CLIENT_ID",
+      "AZURE_TENANT_ID",
+      "ALLOWED_EMAILS"
+    ]
+  }
+}

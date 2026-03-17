@@ -7,6 +7,7 @@ dependencies = [
     "litellm>=1.30",
     "openpyxl>=3.1",
     "python-docx>=0.8",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]

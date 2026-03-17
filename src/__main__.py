@@ -163,6 +163,16 @@ def cmd_review(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    import logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s %(name)s: %(message)s",
+        stream=sys.stderr,
+    )
+
     parser = argparse.ArgumentParser(
         prog="fisc-qav2",
         description="FISC アンケート自動回答マルチエージェントシステム v2",

@@ -16,7 +16,9 @@ class Config:
     model: str = field(
         default_factory=lambda: os.environ.get("FISC_MODEL", "claude-sonnet-4-20250514")
     )
-    api_key: str = field(default_factory=lambda: os.environ.get("FISC_API_KEY", ""))
+    api_key: str = field(
+        default_factory=lambda: os.environ.get("FISC_API_KEY", "") or os.environ.get("OPENAI_API_KEY", "")
+    )
     output_dir: str = field(
         default_factory=lambda: os.environ.get("FISC_OUTPUT_DIR", "output")
     )

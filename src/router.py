@@ -5,10 +5,38 @@ from __future__ import annotations
 import json
 import logging
 
+from litellm.utils import supports_response_schema
+
 from .models import IndexEntry, Question, ReaderAssignment, RoutingResult
-from .reader import _is_openai_model
 
 logger = logging.getLogger(__name__)
+
+_ROUTER_RESPONSE_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "router_response",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "routing": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "question_no": {"type": "integer"},
+                            "files": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["question_no", "files"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["routing"],
+            "additionalProperties": False,
+        },
+    },
+}
 
 # 大分類→KBカテゴリ+キーワードの静的マッピング
 _CATEGORY_HINTS: dict[str, list[str]] = {
@@ -167,11 +195,13 @@ def _llm_route(
 
     kwargs: dict = dict(
         model=model,
-        max_tokens=2048,
+        max_tokens=4096,
         messages=[{"role": "user", "content": prompt}],
         api_key=api_key or None,
     )
-    if _is_openai_model(model):
+    if supports_response_schema(model, None):
+        kwargs["response_format"] = _ROUTER_RESPONSE_SCHEMA
+    else:
         kwargs["response_format"] = {"type": "json_object"}
 
     response = litellm.completion(**kwargs)

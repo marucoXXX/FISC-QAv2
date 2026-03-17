@@ -7,10 +7,42 @@ import logging
 from pathlib import Path
 
 import litellm
+from litellm.utils import supports_response_schema
 
 from .models import Answer, Confidence, Question
 
 logger = logging.getLogger(__name__)
+
+_READER_RESPONSE_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "reader_response",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "answers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "question_no": {"type": "integer"},
+                            "answer": {"type": "string"},
+                            "status": {"type": "string"},
+                            "source_references": {"type": "array", "items": {"type": "string"}},
+                            "confidence": {"type": "string"},
+                            "key_excerpt": {"type": "string"},
+                        },
+                        "required": ["question_no", "answer", "status", "source_references", "confidence", "key_excerpt"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["answers"],
+            "additionalProperties": False,
+        },
+    },
+}
 
 SYSTEM_PROMPT = """\
 あなたはFISC（金融情報システムセンター）のセキュリティアンケートに回答する専門家です。
@@ -23,8 +55,8 @@ SYSTEM_PROMPT = """\
 4. 回答は具体的かつ簡潔に記述する
 5. 必ず根拠となるドキュメントのセクションを明記する
 
-出力は以下のJSON配列形式で返してください:
-[
+出力は以下のJSON形式で返してください:
+{"answers": [
   {
     "question_no": <int>,
     "answer": "<回答テキスト>",
@@ -33,7 +65,7 @@ SYSTEM_PROMPT = """\
     "confidence": "high" | "medium" | "low",
     "key_excerpt": "<根拠となる文章の抜粋>"
   }
-]
+]}
 """
 
 
@@ -79,7 +111,7 @@ def _build_user_prompt(
     for q in questions:
         parts.append(f"- Q{q.no} [{q.major} > {q.minor}]: {q.question}")
 
-    parts.append("\n上記の質問すべてにJSON配列形式で回答してください。")
+    parts.append('\n上記の質問すべてに{"answers": [...]}形式で回答してください。')
     return "\n".join(parts)
 
 
@@ -110,7 +142,9 @@ def run_reader(
         ],
         api_key=api_key or None,
     )
-    if _is_openai_model(model):
+    if supports_response_schema(model, None):
+        kwargs["response_format"] = _READER_RESPONSE_SCHEMA
+    elif _is_openai_model(model):
         kwargs["response_format"] = {"type": "json_object"}
 
     response = litellm.completion(**kwargs)
@@ -277,14 +311,14 @@ def _extract_json_array(text: str) -> str:
 
 def _parse_reader_response(text: str, questions: list[Question]) -> list[Answer]:
     if not text or not text.strip():
-        logger.warning("[Reader] Empty response text")
+        logger.warning("[Reader] Empty response text: %s", repr(text)[:100])
         return [
             Answer(
                 question_no=q.no,
                 answer="",
                 status="回答不可候補",
                 confidence=Confidence.LOW.value,
-                flag="LLM応答のパースに失敗",
+                flag=f"LLM応答のパースに失敗: {repr(text)[:100]}",
             )
             for q in questions
         ]
@@ -309,19 +343,22 @@ def _parse_reader_response(text: str, questions: list[Question]) -> list[Answer]
                     answer="",
                     status="回答不可候補",
                     confidence=Confidence.LOW.value,
-                    flag="LLM応答のパースに失敗",
+                    flag=f"LLM応答のパースに失敗: {text[:200]}",
                 )
                 for q in questions
             ]
 
     # LLMがオブジェクトで包んだ場合、中の配列を取り出す
     if isinstance(data, dict):
-        for val in data.values():
-            if isinstance(val, list):
-                data = val
-                break
+        if "question_no" in data:
+            data = [data]
         else:
-            data = []
+            for val in data.values():
+                if isinstance(val, list) and val and isinstance(val[0], dict):
+                    data = val
+                    break
+            else:
+                data = []
 
     return _parse_items(data, questions)
 

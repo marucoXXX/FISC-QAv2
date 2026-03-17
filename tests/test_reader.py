@@ -179,7 +179,7 @@ class TestReaderMock:
 
         assert len(answers) == 2
         assert all(a.confidence == Confidence.LOW.value for a in answers)
-        assert all(a.flag == "LLM応答のパースに失敗" for a in answers)
+        assert all(a.flag.startswith("LLM応答のパースに失敗") for a in answers)
 
     @patch("src.reader.litellm.completion")
     def test_run_reader_truncated_recoverable(self, mock_completion, sample_questions, mock_llm_response, kb_dir):
@@ -221,13 +221,37 @@ class TestReaderMock:
         assert all(a.flag == "LLM応答がトークン上限で切断" for a in answers)
         assert all(a.confidence == Confidence.LOW.value for a in answers)
 
+    @patch("src.reader.supports_response_schema", return_value=True)
     @patch("src.reader.litellm.completion")
-    def test_run_reader_openai_response_format(self, mock_completion, sample_questions, mock_llm_response, kb_dir):
-        """OpenAIモデル使用時にresponse_formatが付加されること。"""
-        response_json = json.dumps([
-            {"question_no": 1, "answer": "回答1", "status": "対応済", "confidence": "high"},
-            {"question_no": 2, "answer": "回答2", "status": "対応済", "confidence": "high"},
-        ])
+    def test_run_reader_json_schema_response_format(self, mock_completion, mock_supports, sample_questions, mock_llm_response, kb_dir):
+        """supports_response_schema=True のモデルで json_schema が付加されること。"""
+        response_json = json.dumps({"answers": [
+            {"question_no": 1, "answer": "回答1", "status": "対応済", "source_references": [], "confidence": "high", "key_excerpt": ""},
+            {"question_no": 2, "answer": "回答2", "status": "対応済", "source_references": [], "confidence": "high", "key_excerpt": ""},
+        ]})
+        mock_completion.return_value = mock_llm_response(response_json)
+
+        run_reader(
+            reader_id="test",
+            questions=sample_questions,
+            files=["policies/security_policy.pdf"],
+            kb_base_dir=kb_dir,
+            api_key="fake-key",
+            model="gpt-4o",
+        )
+
+        call_kwargs = mock_completion.call_args[1]
+        assert call_kwargs["response_format"]["type"] == "json_schema"
+        assert call_kwargs["max_tokens"] == 16384
+
+    @patch("src.reader.supports_response_schema", return_value=False)
+    @patch("src.reader.litellm.completion")
+    def test_run_reader_fallback_json_object(self, mock_completion, mock_supports, sample_questions, mock_llm_response, kb_dir):
+        """supports_response_schema=False かつ OpenAI モデルで json_object にフォールバック。"""
+        response_json = json.dumps({"answers": [
+            {"question_no": 1, "answer": "回答1", "status": "対応済", "source_references": [], "confidence": "high", "key_excerpt": ""},
+            {"question_no": 2, "answer": "回答2", "status": "対応済", "source_references": [], "confidence": "high", "key_excerpt": ""},
+        ]})
         mock_completion.return_value = mock_llm_response(response_json)
 
         run_reader(
@@ -241,15 +265,15 @@ class TestReaderMock:
 
         call_kwargs = mock_completion.call_args[1]
         assert call_kwargs["response_format"] == {"type": "json_object"}
-        assert call_kwargs["max_tokens"] == 16384
 
+    @patch("src.reader.supports_response_schema", return_value=False)
     @patch("src.reader.litellm.completion")
-    def test_run_reader_anthropic_no_response_format(self, mock_completion, sample_questions, mock_llm_response, kb_dir):
-        """Anthropicモデル使用時にresponse_formatが付加されないこと。"""
-        response_json = json.dumps([
-            {"question_no": 1, "answer": "回答1", "status": "対応済", "confidence": "high"},
-            {"question_no": 2, "answer": "回答2", "status": "対応済", "confidence": "high"},
-        ])
+    def test_run_reader_no_response_format_non_openai(self, mock_completion, mock_supports, sample_questions, mock_llm_response, kb_dir):
+        """supports_response_schema=False かつ非OpenAIモデルで response_format なし。"""
+        response_json = json.dumps({"answers": [
+            {"question_no": 1, "answer": "回答1", "status": "対応済", "source_references": [], "confidence": "high", "key_excerpt": ""},
+            {"question_no": 2, "answer": "回答2", "status": "対応済", "source_references": [], "confidence": "high", "key_excerpt": ""},
+        ]})
         mock_completion.return_value = mock_llm_response(response_json)
 
         run_reader(
@@ -418,19 +442,69 @@ class TestParseReaderResponseOpenAI:
         """None入力でエラーにならずフラグ付き回答を返す。"""
         answers = _parse_reader_response(None, questions)
         assert len(answers) == 2
-        assert all(a.flag == "LLM応答のパースに失敗" for a in answers)
+        assert all(a.flag.startswith("LLM応答のパースに失敗") for a in answers)
 
     def test_empty_string_input(self, questions):
         """空文字入力でエラーにならずフラグ付き回答を返す。"""
         answers = _parse_reader_response("", questions)
         assert len(answers) == 2
-        assert all(a.flag == "LLM応答のパースに失敗" for a in answers)
+        assert all(a.flag.startswith("LLM応答のパースに失敗") for a in answers)
 
     def test_whitespace_only_input(self, questions):
         """空白のみ入力でエラーにならずフラグ付き回答を返す。"""
         answers = _parse_reader_response("   \n  ", questions)
         assert len(answers) == 2
-        assert all(a.flag == "LLM応答のパースに失敗" for a in answers)
+        assert all(a.flag.startswith("LLM応答のパースに失敗") for a in answers)
+
+
+class TestParseReaderResponseDictSafety:
+    """dict→list抽出の型安全化テスト。"""
+
+    @pytest.fixture
+    def questions(self):
+        return [
+            Question(no=1, major="テスト", minor="テスト", question="Q1"),
+        ]
+
+    def test_single_object_with_question_no(self, questions):
+        """単一オブジェクト（配列でなくオブジェクト）が返された場合にリストに変換。"""
+        text = json.dumps({
+            "question_no": 1,
+            "answer": "回答1",
+            "status": "対応済",
+            "source_references": ["test.pdf"],
+            "confidence": "high",
+            "key_excerpt": "抜粋",
+        })
+        answers = _parse_reader_response(text, questions)
+        assert len(answers) == 1
+        assert answers[0].answer == "回答1"
+
+    def test_dict_wrapped_with_answers_key(self, questions):
+        """{"answers": [...]} 形式のパース。"""
+        text = json.dumps({
+            "answers": [
+                {"question_no": 1, "answer": "回答1", "status": "対応済", "confidence": "high", "key_excerpt": ""},
+            ]
+        })
+        answers = _parse_reader_response(text, questions)
+        assert len(answers) == 1
+        assert answers[0].answer == "回答1"
+
+    def test_dict_with_no_list_values(self, questions):
+        """配列値を持たないdictの場合、空データとして扱う。"""
+        text = json.dumps({"message": "no answers here", "count": 0})
+        answers = _parse_reader_response(text, questions)
+        assert len(answers) == 1
+        assert answers[0].confidence == Confidence.LOW.value
+
+    def test_dict_with_non_dict_list(self, questions):
+        """配列値があるが中身がdictでない場合、スキップされる。"""
+        text = json.dumps({"tags": ["a", "b"], "answers": [{"question_no": 1, "answer": "OK", "status": "対応済", "confidence": "high"}]})
+        answers = _parse_reader_response(text, questions)
+        # "tags" は非dict配列なのでスキップ、"answers" がマッチ
+        assert len(answers) == 1
+        assert answers[0].answer == "OK"
 
 
 class TestRunReaderNoneContent:

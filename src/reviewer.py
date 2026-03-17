@@ -6,11 +6,55 @@ import json
 import logging
 
 import litellm
+from litellm.utils import supports_response_schema
 
 from .models import Answer, Confidence, Question, ReviewNote
-from .reader import _is_openai_model
 
 logger = logging.getLogger(__name__)
+
+_REVIEWER_RESPONSE_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "reviewer_response",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "final_judgments": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "question_no": {"type": "integer"},
+                            "confidence_override": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                            "status_override": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                            "flag": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                        },
+                        "required": ["question_no", "confidence_override", "status_override", "flag"],
+                        "additionalProperties": False,
+                    },
+                },
+                "review_notes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "question_no": {"type": "integer"},
+                            "issue_type": {"type": "string"},
+                            "severity": {"type": "string"},
+                            "description": {"type": "string"},
+                            "suggestion": {"type": "string"},
+                        },
+                        "required": ["question_no", "issue_type", "severity", "description", "suggestion"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["final_judgments", "review_notes"],
+            "additionalProperties": False,
+        },
+    },
+}
 
 SYSTEM_PROMPT = """\
 あなたはFISCアンケート回答の品質レビュー担当者です。
@@ -110,7 +154,9 @@ def run_reviewer(
         ],
         api_key=api_key or None,
     )
-    if _is_openai_model(model):
+    if supports_response_schema(model, None):
+        kwargs["response_format"] = _REVIEWER_RESPONSE_SCHEMA
+    else:
         kwargs["response_format"] = {"type": "json_object"}
 
     response = litellm.completion(**kwargs)

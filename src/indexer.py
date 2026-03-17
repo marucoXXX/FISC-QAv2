@@ -9,21 +9,26 @@ from pathlib import Path
 
 from .models import IndexEntry
 
-# 1トークン ≈ 4文字（日本語は約2文字）として推定
-_CHARS_PER_TOKEN_EN = 4
-_CHARS_PER_TOKEN_JA = 2
-
 # 要約の最大文字数
 _SUMMARY_MAX_CHARS = 500
 
 # DOCX で目次とみなすパターン
 _TOC_PATTERNS = re.compile(r"^(目次|table of contents|contents)\s*$", re.IGNORECASE)
 
+# tiktoken エンコーダ（遅延初期化）
+_encoder = None
+
+
+def _get_encoder():
+    global _encoder
+    if _encoder is None:
+        import tiktoken
+        _encoder = tiktoken.get_encoding("cl100k_base")
+    return _encoder
+
 
 def _estimate_tokens(text: str) -> int:
-    ja_count = sum(1 for c in text if ord(c) > 0x3000)
-    en_count = len(text) - ja_count
-    return int(ja_count / _CHARS_PER_TOKEN_JA + en_count / _CHARS_PER_TOKEN_EN)
+    return len(_get_encoder().encode(text))
 
 
 def _extract_summary_pdf(path: Path, max_pages: int = 2) -> tuple[str, int]:
@@ -181,7 +186,9 @@ def run_indexer(
 
     entries: list[IndexEntry] = []
     for f in sorted(kb_dir.rglob("*")):
-        if not f.is_file() or f.name.startswith("."):
+        if not f.is_file() or f.name.startswith(".") or f.name.startswith("~$"):
+            continue
+        if any(part.startswith(".") for part in f.relative_to(kb_dir).parts):
             continue
         summary, tokens = _extract_summary(f)
         last_modified = _file_modified_iso(f)

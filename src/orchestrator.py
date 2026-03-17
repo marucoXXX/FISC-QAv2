@@ -30,6 +30,8 @@ def _load_past_answers(kb_dir: Path) -> dict[str, dict]:
 
     past: dict[str, dict] = {}
     for xlsx in sorted(past_dir.glob("*.xlsx"), reverse=True):
+        if xlsx.name.startswith("~$"):
+            continue
         wb = load_workbook(str(xlsx), read_only=True, data_only=True)
         ws = wb.active
         for row in ws.iter_rows(min_row=2, values_only=True):
@@ -78,6 +80,7 @@ def _run_single_reader(
 ) -> list[Answer]:
     """1つの Reader を最大 max_retries 回リトライ付きで実行する。"""
     assigned_qs = [q for q in questions if q.no in assignment.questions]
+    last_error: Exception | None = None
 
     for attempt in range(config.max_reader_retries):
         try:
@@ -90,6 +93,7 @@ def _run_single_reader(
                 model=config.model,
             )
         except Exception as e:
+            last_error = e
             if attempt < config.max_reader_retries - 1:
                 wait = 2 ** attempt
                 _log(f"  Reader {assignment.reader_id} リトライ ({attempt + 1}/{config.max_reader_retries}): {e}")
@@ -98,13 +102,14 @@ def _run_single_reader(
                 _log(f"  Reader {assignment.reader_id} 失敗: {e}")
 
     # 全リトライ失敗 → 未回答を返す
+    error_detail = str(last_error)[:200] if last_error else "unknown"
     return [
         Answer(
             question_no=q.no,
             answer="",
             status="未回答",
             confidence=Confidence.LOW.value,
-            flag="Reader実行失敗",
+            flag=f"Reader実行失敗: {error_detail}",
         )
         for q in assigned_qs
     ]

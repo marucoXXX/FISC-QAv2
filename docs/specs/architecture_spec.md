@@ -1,5 +1,6 @@
 # FISC Multi-Agent System — Architecture Specification
-# Version: 2.1 | Date: 2026-03-07 | Format: Machine-readable spec (AI-interpretable)
+# Version: 2.2 | Date: 2026-03-10 | Format: Machine-readable spec (AI-interpretable)
+# See also: agent_roles.md for detailed role analysis of each agent
 
 ---
 
@@ -7,16 +8,16 @@
 
 ```yaml
 system_name: FISC アンケート自動回答システム
-version: "2.1"
+version: "2.2"
 pattern_reference: "Microsoft Azure Architecture Center — AI Agent Orchestration Patterns"
 orchestration_patterns:
   - Sequential Orchestration  # 全体パイプライン
   - Concurrent Orchestration  # Parallel Readers
-language: Python 3.11+
+language: Python 3.9+
 framework_backend: FastAPI
-framework_frontend: React
-ai_model_primary: claude-sonnet-4-5
-ai_model_router: claude-haiku
+framework_frontend: Vanilla JS SPA  # static files served by FastAPI
+ai_model_primary: configurable via litellm  # claude-sonnet-4-5, gpt-4o, etc.
+ai_model_router: configurable  # claude-haiku or same as primary
 ```
 
 ---
@@ -76,7 +77,7 @@ error_handling:
   max_retries: 3
   on_failure: graceful_degradation → human_escalation
 tech:
-  - Python asyncio
+  - ThreadPoolExecutor  # concurrent.futures for parallel Reader dispatch
 ```
 
 ---
@@ -87,7 +88,7 @@ tech:
 id: agent1
 name: インデックスエージェント
 pattern: Sequential
-role: 知識ベースの軽量インデックス生成（毎回再生成・キャッシュなし）
+role: 知識ベースの軽量インデックス生成（キャッシュ対応・変更検知あり）
 input:
   - type: filesystem
     path: /knowledge_base/**
@@ -100,8 +101,10 @@ output:
       summary: string       # 先頭ページから抽出した要約
       category: string      # 推定カテゴリ
       est_tokens: integer   # 推定トークン数
+      last_modified: string  # ISO8601 mtime
+      updated: boolean       # 前回インデックスと比較した変更フラグ
     destination: agent2
-regenerate_every_run: true
+cache: .fisc_index_cache.json  # JSON形式でインデックスをキャッシュ
 tech:
   - PyMuPDF       # PDF読み込み
   - python-docx   # Word読み込み
@@ -174,7 +177,7 @@ per_reader:
 isolation: true   # 各 Reader は互いの結果を参照しない
 conflict_resolution: agent4_reviewer   # 矛盾はReviewerが解消
 tech:
-  - claude-sonnet-4-5
+  - litellm  # multi-provider LLM support
 ```
 
 ---
@@ -220,7 +223,7 @@ context_size_note: >
   コンテキスト = 質問数 × サマリー数百token のみ。
   ドキュメントファイル数が増加してもReviewerのメモリは肥大しない。
 tech:
-  - claude-sonnet-4-5
+  - litellm  # multi-provider LLM support
 ```
 
 ---
@@ -328,31 +331,33 @@ monitoring:
 
 ```yaml
 backend:
-  language: Python 3.11+
+  language: Python 3.9+
   api_framework: FastAPI
   endpoints:
-    - POST /run      # パイプライン実行
-    - POST /export   # Excel出力
+    - POST /api/runs              # パイプライン実行
+    - GET  /api/runs/{id}/events  # SSE進捗ストリーム
+    - GET  /api/runs/{id}/answers # 回答一覧
+    - POST /api/export            # Excel出力
+    - GET  /api/config            # Config API
 
 frontend:
-  framework: React
+  framework: Vanilla JS SPA  # static files served by FastAPI
   features:
     - 回答カード表示
     - インライン編集
-    - 🚩フラグハイライト
-    - 承認ボタン
+    - フラグハイライト
+    - 承認ボタン / 全件承認
     - Excelダウンロード
+    - パイプライン進捗SSE表示
 
 document_processing:
-  pdf:   PyMuPDF
+  pdf:   PyMuPDF (optional, with fallback)
   word:  python-docx
   excel: openpyxl
 
 ai:
-  provider: Anthropic Claude API
-  models:
-    - claude-sonnet-4-5   # Reader / Reviewer
-    - claude-haiku        # Router
+  provider: litellm (multi-provider)  # Anthropic, OpenAI, etc.
+  models: configurable via FISC_MODEL env var
 
 output_format:
   type: Excel (.xlsx)
@@ -388,8 +393,8 @@ output_format:
 
 ```yaml
 - topic: ドキュメント大幅増加対応
-  current: 毎回インデックス再生成
-  future: インデックスキャッシュ化（差分更新）
+  current: インデックスキャッシュ対応済み（.fisc_index_cache.json + mtime変更検知）
+  future: より高度な差分更新（コンテンツハッシュベース）
 
 - topic: Readerスケール上限
   current: 動的・上限未設定
