@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import os
 import sys
 import traceback
+from typing import Optional
 
 from pydantic_settings import BaseSettings
 
@@ -17,7 +20,7 @@ def _is_local() -> bool:
     return result
 
 
-def _get_secret(secret_id: str) -> str | None:
+def _get_secret(secret_id: str) -> Optional[str]:
     """本番環境でSecret Managerからシークレットを取得"""
     _debug(f"_get_secret('{secret_id}') called")
 

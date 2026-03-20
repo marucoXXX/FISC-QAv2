@@ -118,6 +118,98 @@ def _run_pipeline_thread(
         _semaphore.release()
 
 
+def start_session_pipeline_job(
+    session_id: int,
+    unresolved_questions: list,
+    config: Config,
+    db_path: Path,
+) -> str:
+    job_id = uuid.uuid4().hex[:12]
+    job = JobState(job_id=job_id)
+    _jobs[job_id] = job
+
+    thread = threading.Thread(
+        target=_run_session_pipeline_thread,
+        args=(job, session_id, unresolved_questions, config, db_path),
+        daemon=True,
+    )
+    thread.start()
+    return job_id
+
+
+def _run_session_pipeline_thread(
+    job: JobState,
+    session_id: int,
+    unresolved_questions: list,
+    config: Config,
+    db_path: Path,
+) -> None:
+    acquired = _semaphore.acquire(timeout=0)
+    if not acquired:
+        job.status = "error"
+        job.error = "別のパイプラインが実行中です。完了までお待ちください。"
+        return
+
+    try:
+        job.status = "running"
+        job.progress.append(f"セッション #{session_id}: {len(unresolved_questions)}件の質問を生成中...")
+
+        from ..orchestrator import run_pipeline
+        from ..excel_io import read_questionnaire
+        from ..web import db as web_db
+
+        session = web_db.get_session(db_path, session_id)
+        if not session:
+            raise ValueError("Session not found")
+
+        capture = _ProgressCapture(job)
+        old_stderr = sys.stderr
+        sys.stderr = capture  # type: ignore[assignment]
+
+        try:
+            # Use existing pipeline for generation
+            kb_dir = Path(config.kb_dir)
+            source_path = Path(session.get("source_file_path", ""))
+
+            if source_path.exists() and kb_dir.exists():
+                output_path = run_pipeline(source_path, kb_dir, config)
+
+                # Parse results and update session questions
+                from ..web.app import _parse_excel
+                content = output_path.read_bytes()
+                _, answers, _ = _parse_excel(content)
+
+                answer_map = {a["question_no"]: a for a in answers}
+                unresolved_nos = {q["question_no"] for q in unresolved_questions}
+
+                for q_no in unresolved_nos:
+                    ans = answer_map.get(q_no)
+                    if ans and ans.get("answer"):
+                        refs = ans.get("source_references", [])
+                        web_db.update_session_question(db_path, session_id, q_no,
+                            answer_source="generated",
+                            answer_text=ans["answer"],
+                            source_references=refs,
+                            confidence=ans.get("confidence", ""),
+                            step_resolved=4,
+                        )
+            else:
+                job.progress.append("ソースファイルまたはKBが見つかりません")
+        finally:
+            sys.stderr = old_stderr
+
+        web_db.update_session(db_path, session_id, current_step=5)
+        job.status = "done"
+        job.progress.append("生成完了")
+
+    except Exception as e:
+        job.status = "error"
+        job.error = str(e)
+        job.progress.append(f"エラー: {e}")
+    finally:
+        _semaphore.release()
+
+
 def get_job(job_id: str) -> Optional[JobState]:
     return _jobs.get(job_id)
 

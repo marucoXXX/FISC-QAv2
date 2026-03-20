@@ -70,9 +70,9 @@ start_backend() {
         return 0
     fi
     log_info "Starting Backend..."
-    cd "$PROJECT_ROOT/backend"
-    source .venv/bin/activate
-    uvicorn app.main:app --reload --port 8000 \
+    cd "$PROJECT_ROOT"
+    source backend/.venv/bin/activate
+    PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/backend" uvicorn backend.app.main:app --reload --port 8000 \
         > /tmp/fisc-qav2-backend.log 2>&1 &
 
     # Wait for startup

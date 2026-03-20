@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { Home, LogOut } from "lucide-react"
+import { Building2, BookOpen, Home, LogOut, FileText } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -16,9 +16,19 @@ import { useAuth } from "@/hooks/useAuth"
 
 const menuItems = [
   {
-    title: "Welcome",
-    url: "/welcome",
-    icon: Home,
+    title: "銀行管理",
+    url: "/banks",
+    icon: Building2,
+  },
+  {
+    title: "共通回答DB",
+    url: "/common-answers",
+    icon: BookOpen,
+  },
+  {
+    title: "セッション",
+    url: "/sessions",
+    icon: FileText,
   },
 ]
 

@@ -1,4 +1,4 @@
-"""SQLite database layer for review workflow."""
+"""SQLite database layer for FISC-QAv2."""
 
 from __future__ import annotations
 
@@ -55,6 +55,92 @@ CREATE TABLE IF NOT EXISTS review_notes (
 CREATE INDEX IF NOT EXISTS idx_answers_run ON answers(run_id);
 CREATE INDEX IF NOT EXISTS idx_answers_review ON answers(run_id, review_status);
 CREATE INDEX IF NOT EXISTS idx_notes_run ON review_notes(run_id);
+
+-- 銀行マスタ（フォーマット設定含む）
+CREATE TABLE IF NOT EXISTS banks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    code TEXT NOT NULL UNIQUE,
+    file_format TEXT NOT NULL DEFAULT 'xlsx',
+    question_col TEXT NOT NULL DEFAULT 'D',
+    answer_col TEXT NOT NULL DEFAULT 'E',
+    header_row INTEGER NOT NULL DEFAULT 1,
+    data_start_row INTEGER NOT NULL DEFAULT 2,
+    table_index INTEGER NOT NULL DEFAULT 0,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- 銀行別の過去Q&Aペア
+CREATE TABLE IF NOT EXISTS past_qa (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bank_id INTEGER NOT NULL REFERENCES banks(id) ON DELETE CASCADE,
+    question_text TEXT NOT NULL,
+    answer_text TEXT NOT NULL,
+    source_file TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_past_qa_bank ON past_qa(bank_id);
+
+-- 共通回答DB
+CREATE TABLE IF NOT EXISTS common_answers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_pattern TEXT NOT NULL,
+    answer_text TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- セッション（5ステップワークフローの単位）
+CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bank_id INTEGER NOT NULL REFERENCES banks(id),
+    name TEXT NOT NULL,
+    current_step INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'in_progress',
+    source_file_name TEXT NOT NULL DEFAULT '',
+    source_file_path TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- セッション内の各質問
+CREATE TABLE IF NOT EXISTS session_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    question_no INTEGER NOT NULL,
+    major TEXT NOT NULL DEFAULT '',
+    minor TEXT NOT NULL DEFAULT '',
+    question_text TEXT NOT NULL DEFAULT '',
+    answer_source TEXT NOT NULL DEFAULT 'pending',
+    answer_text TEXT NOT NULL DEFAULT '',
+    source_references TEXT NOT NULL DEFAULT '[]',
+    confidence TEXT NOT NULL DEFAULT '',
+    matched_past_qa_id INTEGER REFERENCES past_qa(id),
+    past_question_text TEXT NOT NULL DEFAULT '',
+    past_answer_text TEXT NOT NULL DEFAULT '',
+    matched_common_id INTEGER REFERENCES common_answers(id),
+    common_answer_text TEXT NOT NULL DEFAULT '',
+    user_confirmed INTEGER NOT NULL DEFAULT 0,
+    step_resolved INTEGER NOT NULL DEFAULT 0,
+    add_to_common INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(session_id, question_no)
+);
+CREATE INDEX IF NOT EXISTS idx_sq_session ON session_questions(session_id);
+
+-- アップロードファイル管理
+CREATE TABLE IF NOT EXISTS uploaded_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bank_id INTEGER NOT NULL REFERENCES banks(id) ON DELETE CASCADE,
+    file_type TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    stored_path TEXT NOT NULL,
+    uploaded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_uf_bank ON uploaded_files(bank_id);
 """
 
 
@@ -256,6 +342,298 @@ def get_run_stats(db_path: Path, run_id: int) -> dict:
     stats = dict(row)
     stats["review_notes_count"] = note_count
     return stats
+
+
+# ===== Bank CRUD =====
+
+
+def create_bank(
+    db_path: Path,
+    name: str,
+    code: str,
+    file_format: str = "xlsx",
+    question_col: str = "D",
+    answer_col: str = "E",
+    header_row: int = 1,
+    data_start_row: int = 2,
+    table_index: int = 0,
+    notes: str = "",
+) -> int:
+    now = datetime.now().isoformat()
+    with get_conn(db_path) as conn:
+        cur = conn.execute(
+            "INSERT INTO banks (name, code, file_format, question_col, answer_col, "
+            "header_row, data_start_row, table_index, notes, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (name, code, file_format, question_col, answer_col,
+             header_row, data_start_row, table_index, notes, now, now),
+        )
+        return cur.lastrowid
+
+
+def list_banks(db_path: Path) -> list[dict]:
+    with get_conn(db_path) as conn:
+        rows = conn.execute(
+            "SELECT b.*, COUNT(pq.id) as past_qa_count "
+            "FROM banks b LEFT JOIN past_qa pq ON b.id = pq.bank_id "
+            "GROUP BY b.id ORDER BY b.name"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_bank(db_path: Path, bank_id: int) -> dict | None:
+    with get_conn(db_path) as conn:
+        row = conn.execute("SELECT * FROM banks WHERE id = ?", (bank_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def update_bank(db_path: Path, bank_id: int, **fields) -> bool:
+    allowed = {"name", "code", "file_format", "question_col", "answer_col",
+               "header_row", "data_start_row", "table_index", "notes"}
+    updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
+    if not updates:
+        return False
+    updates["updated_at"] = datetime.now().isoformat()
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    values = list(updates.values()) + [bank_id]
+    with get_conn(db_path) as conn:
+        cur = conn.execute(f"UPDATE banks SET {set_clause} WHERE id = ?", values)
+        return cur.rowcount > 0
+
+
+def delete_bank(db_path: Path, bank_id: int) -> bool:
+    with get_conn(db_path) as conn:
+        cur = conn.execute("DELETE FROM banks WHERE id = ?", (bank_id,))
+        return cur.rowcount > 0
+
+
+# ===== Past QA CRUD =====
+
+
+def add_past_qa(
+    db_path: Path, bank_id: int, question_text: str, answer_text: str,
+    source_file: str = "",
+) -> int:
+    now = datetime.now().isoformat()
+    with get_conn(db_path) as conn:
+        cur = conn.execute(
+            "INSERT INTO past_qa (bank_id, question_text, answer_text, source_file, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (bank_id, question_text, answer_text, source_file, now),
+        )
+        return cur.lastrowid
+
+
+def bulk_add_past_qa(
+    db_path: Path, bank_id: int, qa_pairs: list[dict], source_file: str = "",
+) -> int:
+    now = datetime.now().isoformat()
+    with get_conn(db_path) as conn:
+        conn.executemany(
+            "INSERT INTO past_qa (bank_id, question_text, answer_text, source_file, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [(bank_id, qa["question_text"], qa["answer_text"], source_file, now)
+             for qa in qa_pairs],
+        )
+        return len(qa_pairs)
+
+
+def list_past_qa(db_path: Path, bank_id: int) -> list[dict]:
+    with get_conn(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM past_qa WHERE bank_id = ? ORDER BY id", (bank_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_past_qa(db_path: Path, past_qa_id: int) -> bool:
+    with get_conn(db_path) as conn:
+        cur = conn.execute("DELETE FROM past_qa WHERE id = ?", (past_qa_id,))
+        return cur.rowcount > 0
+
+
+# ===== Common Answers CRUD =====
+
+
+def create_common_answer(
+    db_path: Path, question_pattern: str, answer_text: str,
+    category: str = "", source: str = "",
+) -> int:
+    now = datetime.now().isoformat()
+    with get_conn(db_path) as conn:
+        cur = conn.execute(
+            "INSERT INTO common_answers (question_pattern, answer_text, category, source, "
+            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (question_pattern, answer_text, category, source, now, now),
+        )
+        return cur.lastrowid
+
+
+def list_common_answers(
+    db_path: Path, category: str | None = None, search: str | None = None,
+) -> list[dict]:
+    with get_conn(db_path) as conn:
+        query = "SELECT * FROM common_answers"
+        params: list[Any] = []
+        conditions = []
+        if category:
+            conditions.append("category = ?")
+            params.append(category)
+        if search:
+            conditions.append("(question_pattern LIKE ? OR answer_text LIKE ?)")
+            params.extend([f"%{search}%", f"%{search}%"])
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY id"
+        rows = conn.execute(query, params).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_common_answer(db_path: Path, common_id: int) -> dict | None:
+    with get_conn(db_path) as conn:
+        row = conn.execute(
+            "SELECT * FROM common_answers WHERE id = ?", (common_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def update_common_answer(db_path: Path, common_id: int, **fields) -> bool:
+    allowed = {"question_pattern", "answer_text", "category", "source"}
+    updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
+    if not updates:
+        return False
+    updates["updated_at"] = datetime.now().isoformat()
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    values = list(updates.values()) + [common_id]
+    with get_conn(db_path) as conn:
+        cur = conn.execute(f"UPDATE common_answers SET {set_clause} WHERE id = ?", values)
+        return cur.rowcount > 0
+
+
+def delete_common_answer(db_path: Path, common_id: int) -> bool:
+    with get_conn(db_path) as conn:
+        cur = conn.execute("DELETE FROM common_answers WHERE id = ?", (common_id,))
+        return cur.rowcount > 0
+
+
+# ===== Session CRUD =====
+
+
+def create_session(
+    db_path: Path, bank_id: int, name: str,
+    source_file_name: str = "", source_file_path: str = "",
+) -> int:
+    now = datetime.now().isoformat()
+    with get_conn(db_path) as conn:
+        cur = conn.execute(
+            "INSERT INTO sessions (bank_id, name, current_step, status, "
+            "source_file_name, source_file_path, created_at, updated_at) "
+            "VALUES (?, ?, 1, 'in_progress', ?, ?, ?, ?)",
+            (bank_id, name, source_file_name, source_file_path, now, now),
+        )
+        return cur.lastrowid
+
+
+def list_sessions(db_path: Path) -> list[dict]:
+    with get_conn(db_path) as conn:
+        rows = conn.execute(
+            "SELECT s.*, b.name as bank_name "
+            "FROM sessions s JOIN banks b ON s.bank_id = b.id "
+            "ORDER BY s.created_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_session(db_path: Path, session_id: int) -> dict | None:
+    with get_conn(db_path) as conn:
+        row = conn.execute(
+            "SELECT s.*, b.name as bank_name, b.code as bank_code, "
+            "b.file_format, b.question_col, b.answer_col, b.header_row, "
+            "b.data_start_row, b.table_index "
+            "FROM sessions s JOIN banks b ON s.bank_id = b.id "
+            "WHERE s.id = ?",
+            (session_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def update_session(db_path: Path, session_id: int, **fields) -> bool:
+    allowed = {"current_step", "status", "name"}
+    updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
+    if not updates:
+        return False
+    updates["updated_at"] = datetime.now().isoformat()
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    values = list(updates.values()) + [session_id]
+    with get_conn(db_path) as conn:
+        cur = conn.execute(f"UPDATE sessions SET {set_clause} WHERE id = ?", values)
+        return cur.rowcount > 0
+
+
+# ===== Session Questions CRUD =====
+
+
+def bulk_add_session_questions(
+    db_path: Path, session_id: int, questions: list[dict],
+) -> int:
+    with get_conn(db_path) as conn:
+        conn.executemany(
+            "INSERT INTO session_questions "
+            "(session_id, question_no, major, minor, question_text) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [(session_id, q["question_no"], q.get("major", ""),
+              q.get("minor", ""), q.get("question_text", ""))
+             for q in questions],
+        )
+        return len(questions)
+
+
+def get_session_questions(
+    db_path: Path, session_id: int, answer_source: str | None = None,
+) -> list[dict]:
+    with get_conn(db_path) as conn:
+        query = "SELECT * FROM session_questions WHERE session_id = ?"
+        params: list[Any] = [session_id]
+        if answer_source:
+            query += " AND answer_source = ?"
+            params.append(answer_source)
+        query += " ORDER BY question_no"
+        rows = conn.execute(query, params).fetchall()
+    results = []
+    for r in rows:
+        d = dict(r)
+        d["source_references"] = json.loads(d["source_references"])
+        results.append(d)
+    return results
+
+
+def update_session_question(db_path: Path, session_id: int, question_no: int, **fields) -> bool:
+    allowed = {
+        "answer_source", "answer_text", "source_references", "confidence",
+        "matched_past_qa_id", "past_question_text", "past_answer_text",
+        "matched_common_id", "common_answer_text",
+        "user_confirmed", "step_resolved", "add_to_common",
+    }
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if not updates:
+        return False
+    if "source_references" in updates and isinstance(updates["source_references"], list):
+        updates["source_references"] = json.dumps(updates["source_references"], ensure_ascii=False)
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    values = list(updates.values()) + [session_id, question_no]
+    with get_conn(db_path) as conn:
+        cur = conn.execute(
+            f"UPDATE session_questions SET {set_clause} "
+            f"WHERE session_id = ? AND question_no = ?", values,
+        )
+        return cur.rowcount > 0
+
+
+def get_unresolved_questions(db_path: Path, session_id: int) -> list[dict]:
+    return get_session_questions(db_path, session_id, answer_source="pending")
+
+
+# ===== Legacy run helpers =====
 
 
 def _update_run_counts(conn: sqlite3.Connection, run_id: int) -> None:
