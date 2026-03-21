@@ -373,3 +373,25 @@ textarea {
   transition: opacity 0.3s;
 }
 .toast.show { opacity: 1; }
+
+/* Banks table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.table th, .table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.table th {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.table tbody tr:hover {
+  background: #f1f3f5;
+}

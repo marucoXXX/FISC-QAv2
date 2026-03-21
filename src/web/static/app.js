@@ -151,11 +151,16 @@ async function renderHome() {
         <h2>実行履歴</h2>
         <div id="runs-list">読み込み中...</div>
       </div>
+      <div class="card">
+        <h2>銀行一覧</h2>
+        <div id="banks-list">読み込み中...</div>
+      </div>
     </div>`;
 
   setupPipelineForm();
   setupImport();
   loadRuns();
+  loadBanks();
 }
 
 function setupPipelineForm() {
@@ -283,6 +288,55 @@ async function loadRuns() {
     el.querySelectorAll(".run-item").forEach(item => {
       item.addEventListener("click", () => navigate("run", { runId: parseInt(item.dataset.id) }));
     });
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--danger)">読み込みエラー: ${e.message}</p>`;
+  }
+}
+
+async function loadBanks() {
+  const el = $("#banks-list");
+  try {
+    const res = await api("/banks");
+    const banks = await res.json();
+    if (!banks.length) {
+      el.innerHTML = "<p style='color:var(--text-muted)'>銀行が登録されていません</p>";
+      return;
+    }
+    // Fetch QA files for all banks in parallel
+    const qaFilesMap = {};
+    await Promise.all(banks.map(async (b) => {
+      try {
+        const r = await api(`/banks/${b.id}/qa-files`);
+        qaFilesMap[b.id] = await r.json();
+      } catch (_) {
+        qaFilesMap[b.id] = [];
+      }
+    }));
+
+    el.innerHTML = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>銀行名</th>
+            <th>QAファイル名</th>
+            <th>過去QA数</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${banks.map(b => {
+            const files = qaFilesMap[b.id] || [];
+            const fileNames = files.length
+              ? files.map(f => `<span class="badge">${f.qa_file_name}</span>`).join(" ")
+              : '<span style="color:var(--text-muted)">-</span>';
+            return `
+              <tr>
+                <td><strong>${b.name}</strong></td>
+                <td>${fileNames}</td>
+                <td>${b.past_qa_count || 0}</td>
+              </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`;
   } catch (e) {
     el.innerHTML = `<p style="color:var(--danger)">読み込みエラー: ${e.message}</p>`;
   }

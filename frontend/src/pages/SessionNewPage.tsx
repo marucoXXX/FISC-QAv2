@@ -10,12 +10,19 @@ type Bank = {
   id: number
   name: string
   code: string
+}
+
+type QaFile = {
+  id: number
+  qa_file_name: string
   file_format: string
 }
 
 export default function SessionNewPage() {
   const [banks, setBanks] = useState<Bank[]>([])
   const [bankId, setBankId] = useState<number | "">("")
+  const [qaFiles, setQaFiles] = useState<QaFile[]>([])
+  const [qaFileId, setQaFileId] = useState<number | "">("")
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -28,6 +35,21 @@ export default function SessionNewPage() {
     })
   }, [])
 
+  useEffect(() => {
+    if (!bankId) {
+      setQaFiles([])
+      setQaFileId("")
+      return
+    }
+    apiFetch(`/api/banks/${bankId}/qa-files`).then(async (res) => {
+      if (res.ok) {
+        const files = await res.json()
+        setQaFiles(files)
+        setQaFileId(files.length === 1 ? files[0].id : "")
+      }
+    })
+  }, [bankId])
+
   const handleSubmit = async () => {
     if (!bankId || !file) return
     setLoading(true)
@@ -36,7 +58,10 @@ export default function SessionNewPage() {
     const formData = new FormData()
     formData.append("file", file)
 
-    const res = await apiFetch(`/api/sessions?bank_id=${bankId}`, {
+    const params = new URLSearchParams({ bank_id: String(bankId) })
+    if (qaFileId) params.set("qa_file_id", String(qaFileId))
+
+    const res = await apiFetch(`/api/sessions?${params}`, {
       method: "POST",
       body: formData,
     })
@@ -49,7 +74,7 @@ export default function SessionNewPage() {
     setLoading(false)
   }
 
-  const selectedBank = banks.find((b) => b.id === bankId)
+  const selectedQf = qaFiles.find((qf) => qf.id === qaFileId)
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -68,12 +93,30 @@ export default function SessionNewPage() {
               <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
             ))}
           </select>
-          {selectedBank && (
-            <p className="text-xs text-muted-foreground">
-              形式: {selectedBank.file_format.toUpperCase()}
-            </p>
-          )}
         </div>
+
+        {bankId && qaFiles.length > 0 && (
+          <div className="space-y-2">
+            <Label>QAファイルを選択</Label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              value={qaFileId}
+              onChange={(e) => setQaFileId(e.target.value ? Number(e.target.value) : "")}
+            >
+              <option value="">選択してください</option>
+              {qaFiles.map((qf) => (
+                <option key={qf.id} value={qf.id}>
+                  {qf.qa_file_name} ({qf.file_format.toUpperCase()})
+                </option>
+              ))}
+            </select>
+            {selectedQf && (
+              <p className="text-xs text-muted-foreground">
+                形式: {selectedQf.file_format.toUpperCase()}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label>質問票ファイル</Label>

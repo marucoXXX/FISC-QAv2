@@ -1,5 +1,7 @@
 """FastAPI application for FISC-QAv2."""
 
+from __future__ import annotations
+
 import json
 import os
 import shutil
@@ -36,24 +38,30 @@ class BulkReviewRequest(BaseModel):
 class BankCreate(BaseModel):
     name: str
     code: str
+    notes: str = ""
+
+class BankUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    notes: Optional[str] = None
+
+class BankQaFileCreate(BaseModel):
+    qa_file_name: str
     file_format: str = "xlsx"
     question_col: str = "D"
     answer_col: str = "E"
     header_row: int = 1
     data_start_row: int = 2
     table_index: int = 0
-    notes: str = ""
 
-class BankUpdate(BaseModel):
-    name: Optional[str] = None
-    code: Optional[str] = None
+class BankQaFileUpdate(BaseModel):
+    qa_file_name: Optional[str] = None
     file_format: Optional[str] = None
     question_col: Optional[str] = None
     answer_col: Optional[str] = None
     header_row: Optional[int] = None
     data_start_row: Optional[int] = None
     table_index: Optional[int] = None
-    notes: Optional[str] = None
 
 class CommonAnswerCreate(BaseModel):
     question_pattern: str
@@ -99,9 +107,7 @@ def create_router(
     def create_bank(req: BankCreate) -> dict:
         try:
             bank_id = db.create_bank(
-                db_path, req.name, req.code, req.file_format,
-                req.question_col, req.answer_col, req.header_row,
-                req.data_start_row, req.table_index, req.notes,
+                db_path, req.name, req.code, req.notes,
             )
         except Exception as e:
             if "UNIQUE" in str(e):
@@ -130,6 +136,50 @@ def create_router(
             raise HTTPException(404)
         return {"ok": True}
 
+    # --- Bank QA Files API ---
+
+    @router.get("/api/banks/{bank_id}/qa-files")
+    def list_bank_qa_files(bank_id: int) -> list[dict]:
+        return db.list_bank_qa_files(db_path, bank_id)
+
+    @router.post("/api/banks/{bank_id}/qa-files")
+    def create_bank_qa_file(bank_id: int, req: BankQaFileCreate) -> dict:
+        bank = db.get_bank(db_path, bank_id)
+        if not bank:
+            raise HTTPException(404, "銀行が見つかりません")
+        try:
+            qa_file_id = db.create_bank_qa_file(
+                db_path, bank_id, req.qa_file_name, req.file_format,
+                req.question_col, req.answer_col, req.header_row,
+                req.data_start_row, req.table_index,
+            )
+        except Exception as e:
+            if "UNIQUE" in str(e):
+                raise HTTPException(409, "同じ銀行に同名のQAファイルが既に存在します")
+            raise
+        return {"id": qa_file_id}
+
+    @router.get("/api/banks/{bank_id}/qa-files/{qa_file_id}")
+    def get_bank_qa_file(bank_id: int, qa_file_id: int) -> dict:
+        qf = db.get_bank_qa_file(db_path, qa_file_id)
+        if not qf:
+            raise HTTPException(404)
+        return qf
+
+    @router.put("/api/banks/{bank_id}/qa-files/{qa_file_id}")
+    def update_bank_qa_file(bank_id: int, qa_file_id: int, req: BankQaFileUpdate) -> dict:
+        ok = db.update_bank_qa_file(db_path, qa_file_id, **req.model_dump(exclude_none=True))
+        if not ok:
+            raise HTTPException(404)
+        return {"ok": True}
+
+    @router.delete("/api/banks/{bank_id}/qa-files/{qa_file_id}")
+    def delete_bank_qa_file(bank_id: int, qa_file_id: int) -> dict:
+        ok = db.delete_bank_qa_file(db_path, qa_file_id)
+        if not ok:
+            raise HTTPException(404)
+        return {"ok": True}
+
     # --- Past QA API ---
 
     @router.get("/api/banks/{bank_id}/past-answers")
@@ -137,16 +187,26 @@ def create_router(
         return db.list_past_qa(db_path, bank_id)
 
     @router.post("/api/banks/{bank_id}/past-answers/upload")
-    async def upload_past_answers(bank_id: int, file: UploadFile) -> dict:
+    async def upload_past_answers(
+        bank_id: int,
+        file: UploadFile,
+        qa_file_id: Optional[int] = Query(None),
+    ) -> dict:
         bank = db.get_bank(db_path, bank_id)
         if not bank:
             raise HTTPException(404, "銀行が見つかりません")
+
+        qf = None
+        if qa_file_id:
+            qf = db.get_bank_qa_file(db_path, qa_file_id)
+            if not qf:
+                raise HTTPException(404, "QAファイルが見つかりません")
 
         if not file.filename:
             raise HTTPException(400, "ファイル名がありません")
 
         content = await file.read()
-        qa_pairs = _extract_qa_pairs(content, file.filename, bank)
+        qa_pairs = _extract_qa_pairs(content, file.filename, qf)
         if not qa_pairs:
             raise HTTPException(400, "Q&Aペアを抽出できませんでした")
 
@@ -205,10 +265,21 @@ def create_router(
         return db.list_sessions(db_path)
 
     @router.post("/api/sessions")
-    async def create_session(bank_id: int = Query(...), file: UploadFile = ...) -> dict:
+    async def create_session(
+        bank_id: int = Query(...),
+        qa_file_id: Optional[int] = Query(None),
+        file: UploadFile = ...,
+    ) -> dict:
         bank = db.get_bank(db_path, bank_id)
         if not bank:
             raise HTTPException(404, "銀行が見つかりません")
+
+        # Get format config from QA file
+        qf = None
+        if qa_file_id:
+            qf = db.get_bank_qa_file(db_path, qa_file_id)
+            if not qf:
+                raise HTTPException(404, "QAファイルが見つかりません")
 
         if not file.filename:
             raise HTTPException(400, "ファイル名がありません")
@@ -219,6 +290,7 @@ def create_router(
         session_id = db.create_session(
             db_path, bank_id, file.filename,
             source_file_name=file.filename,
+            qa_file_id=qa_file_id,
         )
         upload_dir = UPLOAD_DIR / str(session_id)
         upload_dir.mkdir(parents=True, exist_ok=True)
@@ -236,12 +308,12 @@ def create_router(
         from ..file_io import FormatConfig, read_questionnaire
 
         fc = FormatConfig(
-            file_format=bank["file_format"],
-            question_col=bank["question_col"],
-            answer_col=bank["answer_col"],
-            header_row=bank["header_row"],
-            data_start_row=bank["data_start_row"],
-            table_index=bank["table_index"],
+            file_format=qf["file_format"] if qf else "xlsx",
+            question_col=qf["question_col"] if qf else "D",
+            answer_col=qf["answer_col"] if qf else "E",
+            header_row=qf["header_row"] if qf else 1,
+            data_start_row=qf["data_start_row"] if qf else 2,
+            table_index=qf["table_index"] if qf else 0,
         )
         questions = read_questionnaire(stored_path, fc)
         if not questions:
@@ -497,16 +569,16 @@ def create_router(
             from ..file_io import FormatConfig, write_answers_to_original
 
             fc = FormatConfig(
-                file_format=session["file_format"],
-                question_col=session["question_col"],
-                answer_col=session["answer_col"],
-                header_row=session["header_row"],
-                data_start_row=session["data_start_row"],
-                table_index=session["table_index"],
+                file_format=session["file_format"] or "xlsx",
+                question_col=session["question_col"] or "D",
+                answer_col=session["answer_col"] or "E",
+                header_row=session["header_row"] or 1,
+                data_start_row=session["data_start_row"] or 2,
+                table_index=session["table_index"] or 0,
             )
             output_dir = Path(config.output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
-            ext = ".docx" if session["file_format"] == "docx" else ".xlsx"
+            ext = ".docx" if (session["file_format"] or "xlsx") == "docx" else ".xlsx"
             output_path = output_dir / f"FISC回答_{session_id}{ext}"
             write_answers_to_original(source_path, answers, fc, output_path)
 
@@ -828,17 +900,18 @@ def _parse_json(content: bytes) -> tuple[list[dict], list[dict], list[dict]]:
     return questions, answers, notes
 
 
-def _extract_qa_pairs(content: bytes, filename: str, bank: dict) -> list[dict]:
-    """銀行のフォーマット設定に基づいてファイルからQ&Aペアを抽出する"""
-    q_col = bank["question_col"]
-    a_col = bank["answer_col"]
-    header_row = bank["header_row"]
-    data_start = bank["data_start_row"]
+def _extract_qa_pairs(content: bytes, filename: str, qf: dict | None) -> list[dict]:
+    """QAファイルのフォーマット設定に基づいてファイルからQ&Aペアを抽出する"""
+    q_col = qf["question_col"] if qf else "D"
+    a_col = qf["answer_col"] if qf else "E"
+    header_row = qf["header_row"] if qf else 1
+    data_start = qf["data_start_row"] if qf else 2
 
     if filename.endswith(".xlsx"):
         return _extract_qa_from_excel(content, q_col, a_col, header_row, data_start)
     elif filename.endswith(".docx"):
-        return _extract_qa_from_docx(content, bank["table_index"], q_col, a_col, data_start)
+        table_index = qf["table_index"] if qf else 0
+        return _extract_qa_from_docx(content, table_index, q_col, a_col, data_start)
     else:
         return []
 

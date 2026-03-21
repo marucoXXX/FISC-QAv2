@@ -78,7 +78,7 @@ test.describe("Session Workflow", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify([
-          { question_no: 1, question_text: "Q1", major: "", minor: "", past_question_text: "", past_answer_text: "", matched_past_qa_id: null, answer_source: "pending" },
+          { question_no: 1, question_text: "セキュリティポリシーは策定されていますか？", major: "セキュリティ管理", minor: "基本方針", past_question_text: "", past_answer_text: "", matched_past_qa_id: null, answer_source: "pending" },
         ]),
       })
     })
@@ -124,7 +124,7 @@ test.describe("Session Workflow", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify([
-          { question_no: 1, question_text: "Q1", major: "", minor: "", past_question_text: "Past Q1", past_answer_text: "Past A1", matched_past_qa_id: 1, answer_source: "pending" },
+          { question_no: 1, question_text: "セキュリティポリシーは策定されていますか？", major: "セキュリティ管理", minor: "基本方針", past_question_text: "情報セキュリティポリシーの策定状況を教えてください", past_answer_text: "当社ではセキュリティポリシーを策定し、年1回の見直しと全社員への周知を実施しています。", matched_past_qa_id: 1, answer_source: "pending" },
         ]),
       })
     })
@@ -144,7 +144,7 @@ test.describe("Session Workflow", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify([
-          { question_no: 1, question_text: "Q1", major: "", minor: "", past_question_text: "PQ1", past_answer_text: "PA1", matched_past_qa_id: 1, answer_source: "pending" },
+          { question_no: 1, question_text: "セキュリティポリシーは策定されていますか？", major: "セキュリティ管理", minor: "基本方針", past_question_text: "情報セキュリティポリシーの策定状況を教えてください", past_answer_text: "当社ではセキュリティポリシーを策定し、年1回の見直しと全社員への周知を実施しています。", matched_past_qa_id: 1, answer_source: "pending" },
         ]),
       })
     })
@@ -238,8 +238,8 @@ test.describe("Session Workflow", () => {
         body: JSON.stringify({
           session: { id: 1, bank_id: 1, status: "active", current_step: 5 },
           questions: [
-            { question_no: 1, question_text: "Q1", major: "", minor: "", answer_source: "past_match", answer_text: "A1", source_references: [], confidence: "high", add_to_common: 0 },
-            { question_no: 2, question_text: "Q2", major: "", minor: "", answer_source: "common_match", answer_text: "A2", source_references: [], confidence: "high", add_to_common: 0 },
+            { question_no: 1, question_text: "セキュリティポリシーは策定されていますか？", major: "セキュリティ管理", minor: "基本方針", answer_source: "past_match", answer_text: "当社ではセキュリティポリシーを策定し、年1回の見直しと全社員への周知を実施しています。", source_references: [], confidence: "high", add_to_common: 0 },
+            { question_no: 2, question_text: "データのバックアップ体制はどのようになっていますか？", major: "システム運用", minor: "バックアップ", answer_source: "common_match", answer_text: "日次フルバックアップを実施し、遠隔地にも複製を保管しています。RPO4時間、RTO8時間を設定しています。", source_references: [], confidence: "high", add_to_common: 0 },
           ],
           stats: { total: 2, past_match: 1, common_match: 1, generated: 0, manual: 0, pending: 0 },
         }),
@@ -300,7 +300,7 @@ test.describe("Session Workflow", () => {
         body: JSON.stringify({
           session: { id: 1, bank_id: 1, status: finalized ? "completed" : "active", current_step: 5 },
           questions: [
-            { question_no: 1, question_text: "Q1", major: "", minor: "", answer_source: "past_match", answer_text: "A1", source_references: [], confidence: "high", add_to_common: 0 },
+            { question_no: 1, question_text: "セキュリティポリシーは策定されていますか？", major: "セキュリティ管理", minor: "基本方針", answer_source: "past_match", answer_text: "当社ではセキュリティポリシーを策定し、年1回の見直しと全社員への周知を実施しています。", source_references: [], confidence: "high", add_to_common: 0 },
           ],
           stats: { total: 1, past_match: 1, common_match: 0, generated: 0, manual: 0, pending: 0 },
         }),

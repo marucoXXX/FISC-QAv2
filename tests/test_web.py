@@ -1334,3 +1334,99 @@ def test_db_create_bank_unique_constraint(tmp_db):
     db.create_bank(tmp_db, "ユニーク", "UQ01")
     with pytest.raises(Exception, match="UNIQUE"):
         db.create_bank(tmp_db, "ユニーク", "UQ02")  # same name
+
+
+# --- Bank QA Files DB Tests ---
+
+
+def test_db_create_bank_qa_file(tmp_db):
+    bank_id = db.create_bank(tmp_db, "QAファイル銀行", "QF01")
+    qa_file_id = db.create_bank_qa_file(tmp_db, bank_id, "テストシート")
+    assert qa_file_id >= 1
+
+
+def test_db_list_bank_qa_files(tmp_db):
+    bank_id = db.create_bank(tmp_db, "一覧銀行", "LS01")
+    db.create_bank_qa_file(tmp_db, bank_id, "シートA")
+    db.create_bank_qa_file(tmp_db, bank_id, "シートB")
+    files = db.list_bank_qa_files(tmp_db, bank_id)
+    assert len(files) == 2
+    assert files[0]["qa_file_name"] == "シートA"
+    assert files[1]["qa_file_name"] == "シートB"
+
+
+def test_db_delete_bank_qa_file(tmp_db):
+    bank_id = db.create_bank(tmp_db, "削除銀行", "DL01")
+    qa_file_id = db.create_bank_qa_file(tmp_db, bank_id, "削除シート")
+    assert db.delete_bank_qa_file(tmp_db, qa_file_id) is True
+    assert db.list_bank_qa_files(tmp_db, bank_id) == []
+    assert db.delete_bank_qa_file(tmp_db, 9999) is False
+
+
+def test_db_bank_cascade_deletes_qa_files(tmp_db):
+    bank_id = db.create_bank(tmp_db, "カスケード銀行", "CS01")
+    db.create_bank_qa_file(tmp_db, bank_id, "カスケードシート")
+    db.delete_bank(tmp_db, bank_id)
+    assert db.list_bank_qa_files(tmp_db, bank_id) == []
+
+
+def test_db_list_banks_qa_file_count(tmp_db):
+    bank_id = db.create_bank(tmp_db, "カウント銀行", "CT01")
+    db.create_bank_qa_file(tmp_db, bank_id, "シート1")
+    db.create_bank_qa_file(tmp_db, bank_id, "シート2")
+    banks = db.list_banks(tmp_db)
+    bank = next(b for b in banks if b["id"] == bank_id)
+    assert bank["qa_file_count"] == 2
+
+
+# --- Bank QA Files API Tests ---
+
+
+def test_api_create_bank_qa_file(client, bank_id):
+    res = client.post(f"/api/banks/{bank_id}/qa-files", json={"qa_file_name": "APIシート"})
+    assert res.status_code == 200
+    assert "id" in res.json()
+
+
+def test_api_list_bank_qa_files(client, bank_id):
+    client.post(f"/api/banks/{bank_id}/qa-files", json={"qa_file_name": "シートX"})
+    client.post(f"/api/banks/{bank_id}/qa-files", json={"qa_file_name": "シートY"})
+    res = client.get(f"/api/banks/{bank_id}/qa-files")
+    assert res.status_code == 200
+    assert len(res.json()) == 2
+
+
+def test_api_delete_bank_qa_file(client, bank_id):
+    res = client.post(f"/api/banks/{bank_id}/qa-files", json={"qa_file_name": "削除対象"})
+    qa_file_id = res.json()["id"]
+    res = client.delete(f"/api/banks/{bank_id}/qa-files/{qa_file_id}")
+    assert res.status_code == 200
+    assert res.json()["ok"] is True
+
+
+def test_api_create_bank_qa_file_bank_not_found(client):
+    res = client.post("/api/banks/9999/qa-files", json={"qa_file_name": "存在しない"})
+    assert res.status_code == 404
+
+
+# --- Seed Script Tests ---
+
+
+def test_seed_banks(tmp_db):
+    from scripts.seed_banks import seed_banks
+    result = seed_banks(tmp_db)
+    assert result["created_banks"] == 25
+    assert result["created_files"] == 29
+    banks = db.list_banks(tmp_db)
+    assert len(banks) == 25
+
+
+def test_seed_banks_idempotent(tmp_db):
+    from scripts.seed_banks import seed_banks
+    seed_banks(tmp_db)
+    result = seed_banks(tmp_db)
+    assert result["created_banks"] == 0
+    assert result["skipped_banks"] == 25
+    assert result["created_files"] == 0
+    banks = db.list_banks(tmp_db)
+    assert len(banks) == 25

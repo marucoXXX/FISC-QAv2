@@ -17,7 +17,7 @@ test.describe("Common Answers", () => {
     const question = `質問${uid()}`
     await page.getByRole("button", { name: "新規追加" }).click()
     await page.getByPlaceholder("セキュリティポリシーは策定されていますか？").fill(question)
-    await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill("回答テスト")
+    await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill("当社ではセキュリティポリシーを策定し、年1回の見直しと全社員への周知を実施しています。")
     await page.getByRole("button", { name: "追加" }).click()
 
     // Wait for dialog to close
@@ -29,7 +29,7 @@ test.describe("Common Answers", () => {
     const question = `編集Q${uid()}`
     await page.getByRole("button", { name: "新規追加" }).click()
     await page.getByPlaceholder("セキュリティポリシーは策定されていますか？").fill(question)
-    await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill("編集前回答")
+    await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill("アクセス権限は最小権限の原則に基づき、四半期ごとに棚卸しを実施しています。")
     await page.getByRole("button", { name: "追加" }).click()
     await expect(page.getByRole("dialog")).not.toBeVisible()
     await expect(page.getByRole("cell", { name: question })).toBeVisible()
@@ -37,7 +37,7 @@ test.describe("Common Answers", () => {
     // Edit
     const row = page.getByRole("row").filter({ hasText: question })
     await row.getByRole("button").filter({ has: page.locator("svg.lucide-pencil") }).click()
-    const newAnswer = `編集後回答${uid()}`
+    const newAnswer = `アクセス権限は最小権限の原則に基づき、毎月棚卸しを実施しています。${uid()}`
     await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill(newAnswer)
     await page.getByRole("button", { name: "更新" }).click()
 
@@ -49,7 +49,7 @@ test.describe("Common Answers", () => {
     const question = `削除Q${uid()}`
     await page.getByRole("button", { name: "新規追加" }).click()
     await page.getByPlaceholder("セキュリティポリシーは策定されていますか？").fill(question)
-    await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill("削除テスト回答")
+    await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill("障害発生時にはBCP計画に基づき、2時間以内に代替システムへの切り替えを実施します。")
     await page.getByRole("button", { name: "追加" }).click()
     await expect(page.getByRole("dialog")).not.toBeVisible()
     await expect(page.getByRole("cell", { name: question })).toBeVisible()
@@ -68,13 +68,13 @@ test.describe("Common Answers", () => {
 
     await page.getByRole("button", { name: "新規追加" }).click()
     await page.getByPlaceholder("セキュリティポリシーは策定されていますか？").fill(q1)
-    await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill("回答A")
+    await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill("当社では日次でフルバックアップを実施し、遠隔地にも複製を保管しています。RPOは4時間、RTOは8時間に設定しています。")
     await page.getByRole("button", { name: "追加" }).click()
     await expect(page.getByRole("dialog")).not.toBeVisible()
 
     await page.getByRole("button", { name: "新規追加" }).click()
     await page.getByPlaceholder("セキュリティポリシーは策定されていますか？").fill(q2)
-    await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill("回答B")
+    await page.getByPlaceholder("当社ではセキュリティポリシーを策定しており").fill("全社員に対して多要素認証（MFA）を導入済みです。FIDO2セキュリティキーおよびTOTPアプリを認証手段として利用しています。")
     await page.getByRole("button", { name: "追加" }).click()
     await expect(page.getByRole("dialog")).not.toBeVisible()
 
