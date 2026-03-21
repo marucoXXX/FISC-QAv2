@@ -77,6 +77,9 @@ CREATE TABLE IF NOT EXISTS bank_qa_files (
     header_row INTEGER NOT NULL DEFAULT 1,
     data_start_row INTEGER NOT NULL DEFAULT 2,
     table_index INTEGER NOT NULL DEFAULT 0,
+    format_type TEXT NOT NULL DEFAULT 'freetext',
+    choices_col TEXT NOT NULL DEFAULT '',
+    remarks_col TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE(bank_id, qa_file_name)
@@ -89,6 +92,8 @@ CREATE TABLE IF NOT EXISTS past_qa (
     bank_id INTEGER NOT NULL REFERENCES banks(id) ON DELETE CASCADE,
     question_text TEXT NOT NULL,
     answer_text TEXT NOT NULL,
+    choices_text TEXT NOT NULL DEFAULT '',
+    remarks_text TEXT NOT NULL DEFAULT '',
     source_file TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
@@ -127,6 +132,8 @@ CREATE TABLE IF NOT EXISTS session_questions (
     major TEXT NOT NULL DEFAULT '',
     minor TEXT NOT NULL DEFAULT '',
     question_text TEXT NOT NULL DEFAULT '',
+    choices_text TEXT NOT NULL DEFAULT '',
+    remarks_text TEXT NOT NULL DEFAULT '',
     answer_source TEXT NOT NULL DEFAULT 'pending',
     answer_text TEXT NOT NULL DEFAULT '',
     source_references TEXT NOT NULL DEFAULT '[]',
@@ -426,16 +433,21 @@ def create_bank_qa_file(
     header_row: int = 1,
     data_start_row: int = 2,
     table_index: int = 0,
+    format_type: str = "freetext",
+    choices_col: str = "",
+    remarks_col: str = "",
 ) -> int:
     now = datetime.now().isoformat()
     with get_conn(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO bank_qa_files (bank_id, qa_file_name, file_format, "
             "question_col, answer_col, header_row, data_start_row, table_index, "
+            "format_type, choices_col, remarks_col, "
             "created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (bank_id, qa_file_name, file_format, question_col, answer_col,
-             header_row, data_start_row, table_index, now, now),
+             header_row, data_start_row, table_index,
+             format_type, choices_col, remarks_col, now, now),
         )
         return cur.lastrowid
 
@@ -459,7 +471,8 @@ def get_bank_qa_file(db_path: Path, qa_file_id: int) -> dict | None:
 
 def update_bank_qa_file(db_path: Path, qa_file_id: int, **fields) -> bool:
     allowed = {"qa_file_name", "file_format", "question_col", "answer_col",
-               "header_row", "data_start_row", "table_index"}
+               "header_row", "data_start_row", "table_index",
+               "format_type", "choices_col", "remarks_col"}
     updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
     if not updates:
         return False
@@ -482,14 +495,16 @@ def delete_bank_qa_file(db_path: Path, qa_file_id: int) -> bool:
 
 def add_past_qa(
     db_path: Path, bank_id: int, question_text: str, answer_text: str,
-    source_file: str = "",
+    source_file: str = "", choices_text: str = "", remarks_text: str = "",
 ) -> int:
     now = datetime.now().isoformat()
     with get_conn(db_path) as conn:
         cur = conn.execute(
-            "INSERT INTO past_qa (bank_id, question_text, answer_text, source_file, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (bank_id, question_text, answer_text, source_file, now),
+            "INSERT INTO past_qa (bank_id, question_text, answer_text, "
+            "choices_text, remarks_text, source_file, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (bank_id, question_text, answer_text, choices_text, remarks_text,
+             source_file, now),
         )
         return cur.lastrowid
 
@@ -500,9 +515,12 @@ def bulk_add_past_qa(
     now = datetime.now().isoformat()
     with get_conn(db_path) as conn:
         conn.executemany(
-            "INSERT INTO past_qa (bank_id, question_text, answer_text, source_file, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            [(bank_id, qa["question_text"], qa["answer_text"], source_file, now)
+            "INSERT INTO past_qa (bank_id, question_text, answer_text, "
+            "choices_text, remarks_text, source_file, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [(bank_id, qa["question_text"], qa["answer_text"],
+              qa.get("choices_text", ""), qa.get("remarks_text", ""),
+              source_file, now)
              for qa in qa_pairs],
         )
         return len(qa_pairs)
@@ -620,7 +638,8 @@ def get_session(db_path: Path, session_id: int) -> dict | None:
         row = conn.execute(
             "SELECT s.*, b.name as bank_name, b.code as bank_code, "
             "qf.qa_file_name, qf.file_format, qf.question_col, qf.answer_col, "
-            "qf.header_row, qf.data_start_row, qf.table_index "
+            "qf.header_row, qf.data_start_row, qf.table_index, "
+            "qf.format_type, qf.choices_col, qf.remarks_col "
             "FROM sessions s "
             "JOIN banks b ON s.bank_id = b.id "
             "LEFT JOIN bank_qa_files qf ON s.qa_file_id = qf.id "
@@ -652,10 +671,12 @@ def bulk_add_session_questions(
     with get_conn(db_path) as conn:
         conn.executemany(
             "INSERT INTO session_questions "
-            "(session_id, question_no, major, minor, question_text) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "(session_id, question_no, major, minor, question_text, "
+            "choices_text, remarks_text) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             [(session_id, q["question_no"], q.get("major", ""),
-              q.get("minor", ""), q.get("question_text", ""))
+              q.get("minor", ""), q.get("question_text", ""),
+              q.get("choices_text", ""), q.get("remarks_text", ""))
              for q in questions],
         )
         return len(questions)

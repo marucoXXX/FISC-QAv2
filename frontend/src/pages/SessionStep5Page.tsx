@@ -147,11 +147,11 @@ export default function SessionStep5Page() {
             return (
               <TableRow key={q.question_no}>
                 <TableCell className="font-mono text-xs">{q.question_no}</TableCell>
-                <TableCell className="text-sm max-w-xs">
-                  <div className="line-clamp-2">{q.question_text}</div>
+                <TableCell className="text-sm">
+                  <div className="whitespace-pre-wrap">{q.question_text}</div>
                 </TableCell>
-                <TableCell className="text-sm max-w-md">
-                  <div className="line-clamp-3">{q.answer_text || <span className="text-muted-foreground italic">未回答</span>}</div>
+                <TableCell className="text-sm">
+                  <div className="whitespace-pre-wrap">{q.answer_text || <span className="text-muted-foreground italic">未回答</span>}</div>
                   {q.source_references.length > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
                       参照: {q.source_references.join(", ")}

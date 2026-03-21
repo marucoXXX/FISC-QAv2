@@ -45,6 +45,15 @@ type QaFile = {
   header_row: number
   data_start_row: number
   table_index: number
+  format_type: string
+  choices_col: string
+  remarks_col: string
+}
+
+const FORMAT_TYPE_LABELS: Record<string, string> = {
+  choices: "選択肢＋備考型",
+  assessment: "○/△/× 判定型",
+  freetext: "自由記述型",
 }
 
 type PastQA = {
@@ -52,6 +61,8 @@ type PastQA = {
   bank_id: number
   question_text: string
   answer_text: string
+  choices_text: string
+  remarks_text: string
   source_file: string
   created_at: string
 }
@@ -64,6 +75,9 @@ const INITIAL_QF_FORM = {
   header_row: 1,
   data_start_row: 2,
   table_index: 0,
+  format_type: "freetext",
+  choices_col: "",
+  remarks_col: "",
 }
 
 export default function BankDetailPage() {
@@ -120,6 +134,9 @@ export default function BankDetailPage() {
       header_row: qf.header_row,
       data_start_row: qf.data_start_row,
       table_index: qf.table_index,
+      format_type: qf.format_type,
+      choices_col: qf.choices_col,
+      remarks_col: qf.remarks_col,
     })
     setQfError("")
     setQfDialogOpen(true)
@@ -216,6 +233,7 @@ export default function BankDetailPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>QAファイル名</TableHead>
+                  <TableHead>類型</TableHead>
                   <TableHead>形式</TableHead>
                   <TableHead>質問列</TableHead>
                   <TableHead>回答列</TableHead>
@@ -228,6 +246,7 @@ export default function BankDetailPage() {
                 {qaFiles.map((qf) => (
                   <TableRow key={qf.id}>
                     <TableCell className="font-medium">{qf.qa_file_name}</TableCell>
+                    <TableCell className="text-xs">{FORMAT_TYPE_LABELS[qf.format_type] || qf.format_type}</TableCell>
                     <TableCell>{qf.file_format.toUpperCase()}</TableCell>
                     <TableCell>{qf.question_col}</TableCell>
                     <TableCell>{qf.answer_col}</TableCell>
@@ -302,7 +321,9 @@ export default function BankDetailPage() {
             <TableRow>
               <TableHead className="w-12">#</TableHead>
               <TableHead>質問</TableHead>
+              <TableHead>選択肢/判定</TableHead>
               <TableHead>回答</TableHead>
+              <TableHead>備考</TableHead>
               <TableHead className="w-32">ソース</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
@@ -310,7 +331,7 @@ export default function BankDetailPage() {
           <TableBody>
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   過去Q&Aペアがありません
                 </TableCell>
               </TableRow>
@@ -318,9 +339,11 @@ export default function BankDetailPage() {
             {filtered.map((qa, i) => (
               <TableRow key={qa.id}>
                 <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                <TableCell className="max-w-xs truncate">{qa.question_text}</TableCell>
-                <TableCell className="max-w-xs truncate">{qa.answer_text}</TableCell>
-                <TableCell className="text-xs text-muted-foreground truncate">{qa.source_file}</TableCell>
+                <TableCell className="text-sm whitespace-pre-wrap">{qa.question_text}</TableCell>
+                <TableCell className="text-sm whitespace-pre-wrap text-muted-foreground">{qa.choices_text || "-"}</TableCell>
+                <TableCell className="text-sm whitespace-pre-wrap">{qa.answer_text}</TableCell>
+                <TableCell className="text-sm whitespace-pre-wrap text-muted-foreground">{qa.remarks_text || "-"}</TableCell>
+                <TableCell className="text-xs text-muted-foreground whitespace-pre-wrap">{qa.source_file}</TableCell>
                 <TableCell>
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(qa.id)}>
                     <Trash2 className="h-4 w-4" />
@@ -339,13 +362,27 @@ export default function BankDetailPage() {
           </DialogHeader>
           <div className="space-y-4">
             {qfError && <p className="text-sm text-destructive">{qfError}</p>}
-            <div className="space-y-1">
-              <Label>QAファイル名</Label>
-              <Input
-                value={qfForm.qa_file_name}
-                onChange={(e) => setQfForm({ ...qfForm, qa_file_name: e.target.value })}
-                placeholder="セキュリティチェックシート"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>QAファイル名</Label>
+                <Input
+                  value={qfForm.qa_file_name}
+                  onChange={(e) => setQfForm({ ...qfForm, qa_file_name: e.target.value })}
+                  placeholder="セキュリティチェックシート"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>フォーマット類型</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  value={qfForm.format_type}
+                  onChange={(e) => setQfForm({ ...qfForm, format_type: e.target.value })}
+                >
+                  <option value="freetext">自由記述型</option>
+                  <option value="choices">選択肢＋備考型</option>
+                  <option value="assessment">○/△/× 判定型</option>
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
@@ -368,6 +405,18 @@ export default function BankDetailPage() {
                 <Input value={qfForm.answer_col} onChange={(e) => setQfForm({ ...qfForm, answer_col: e.target.value })} />
               </div>
             </div>
+            {qfForm.format_type !== "freetext" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>{qfForm.format_type === "choices" ? "選択肢列" : "判定欄列"}</Label>
+                  <Input value={qfForm.choices_col} onChange={(e) => setQfForm({ ...qfForm, choices_col: e.target.value })} placeholder="F" />
+                </div>
+                <div className="space-y-1">
+                  <Label>備考列</Label>
+                  <Input value={qfForm.remarks_col} onChange={(e) => setQfForm({ ...qfForm, remarks_col: e.target.value })} placeholder="H" />
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <Label>ヘッダー行</Label>

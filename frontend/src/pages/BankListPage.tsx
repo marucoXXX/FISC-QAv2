@@ -31,6 +31,15 @@ type QaFile = {
   header_row: number
   data_start_row: number
   table_index: number
+  format_type: string
+  choices_col: string
+  remarks_col: string
+}
+
+const FORMAT_TYPE_LABELS: Record<string, string> = {
+  choices: "選択肢＋備考型",
+  assessment: "○/△/× 判定型",
+  freetext: "自由記述型",
 }
 
 type Bank = {
@@ -61,6 +70,9 @@ const INITIAL_QF_FORM = {
   header_row: 1,
   data_start_row: 2,
   table_index: 0,
+  format_type: "freetext",
+  choices_col: "",
+  remarks_col: "",
 }
 
 export default function BankListPage() {
@@ -162,6 +174,9 @@ export default function BankListPage() {
         header_row: row.qaFile.header_row,
         data_start_row: row.qaFile.data_start_row,
         table_index: row.qaFile.table_index,
+        format_type: row.qaFile.format_type,
+        choices_col: row.qaFile.choices_col,
+        remarks_col: row.qaFile.remarks_col,
       })
       setQfError("")
       setQfDialogOpen(true)
@@ -287,13 +302,27 @@ export default function BankListPage() {
           </DialogHeader>
           <div className="space-y-4">
             {qfError && <p className="text-sm text-destructive">{qfError}</p>}
-            <div className="space-y-1">
-              <Label>QAファイル名</Label>
-              <Input
-                value={qfForm.qa_file_name}
-                onChange={(e) => setQfForm({ ...qfForm, qa_file_name: e.target.value })}
-                placeholder="セキュリティチェックシート"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>QAファイル名</Label>
+                <Input
+                  value={qfForm.qa_file_name}
+                  onChange={(e) => setQfForm({ ...qfForm, qa_file_name: e.target.value })}
+                  placeholder="セキュリティチェックシート"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>フォーマット類型</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  value={qfForm.format_type}
+                  onChange={(e) => setQfForm({ ...qfForm, format_type: e.target.value })}
+                >
+                  <option value="freetext">自由記述型</option>
+                  <option value="choices">選択肢＋備考型</option>
+                  <option value="assessment">○/△/× 判定型</option>
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
@@ -316,6 +345,18 @@ export default function BankListPage() {
                 <Input value={qfForm.answer_col} onChange={(e) => setQfForm({ ...qfForm, answer_col: e.target.value })} />
               </div>
             </div>
+            {qfForm.format_type !== "freetext" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>{qfForm.format_type === "choices" ? "選択肢列" : "判定欄列"}</Label>
+                  <Input value={qfForm.choices_col} onChange={(e) => setQfForm({ ...qfForm, choices_col: e.target.value })} placeholder="F" />
+                </div>
+                <div className="space-y-1">
+                  <Label>備考列</Label>
+                  <Input value={qfForm.remarks_col} onChange={(e) => setQfForm({ ...qfForm, remarks_col: e.target.value })} placeholder="H" />
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <Label>ヘッダー行</Label>

@@ -111,18 +111,18 @@ export default function SessionStep2Page() {
                 return (
                   <TableRow key={q.question_no} className={!hasMatch ? "opacity-50" : ""}>
                     <TableCell className="font-mono text-xs">{q.question_no}</TableCell>
-                    <TableCell className="text-sm max-w-xs">
-                      <div className="line-clamp-3">{q.question_text}</div>
+                    <TableCell className="text-sm">
+                      <div className="whitespace-pre-wrap">{q.question_text}</div>
                     </TableCell>
-                    <TableCell className="text-sm max-w-xs">
+                    <TableCell className="text-sm">
                       {hasMatch ? (
-                        <div className="line-clamp-3">{q.past_question_text}</div>
+                        <div className="whitespace-pre-wrap">{q.past_question_text}</div>
                       ) : (
                         <span className="text-muted-foreground italic">過去回答なし</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm max-w-xs">
-                      {hasMatch && <div className="line-clamp-3">{q.past_answer_text}</div>}
+                    <TableCell className="text-sm">
+                      {hasMatch && <div className="whitespace-pre-wrap">{q.past_answer_text}</div>}
                     </TableCell>
                     <TableCell className="text-center">
                       {hasMatch && (

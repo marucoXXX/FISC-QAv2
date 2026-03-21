@@ -16,6 +16,9 @@ class FormatConfig:
     header_row: int
     data_start_row: int
     table_index: int = 0
+    format_type: str = "freetext"  # 'choices' | 'assessment' | 'freetext'
+    choices_col: str = ""
+    remarks_col: str = ""
 
 
 @dataclass
@@ -24,6 +27,8 @@ class Question:
     question_text: str
     major: str = ""
     minor: str = ""
+    choices_text: str = ""
+    remarks_text: str = ""
 
 
 def _col_letter_to_index(col: str) -> int:
@@ -45,6 +50,8 @@ def _read_xlsx_questionnaire(path: Path, config: FormatConfig) -> list[Question]
     wb = load_workbook(str(path), read_only=True, data_only=True)
     ws = wb.active
     q_idx = _col_letter_to_index(config.question_col)
+    c_idx = _col_letter_to_index(config.choices_col) if config.choices_col else -1
+    r_idx = _col_letter_to_index(config.remarks_col) if config.remarks_col else -1
 
     questions = []
     for i, row in enumerate(ws.iter_rows(min_row=config.data_start_row, values_only=True), start=1):
@@ -53,14 +60,17 @@ def _read_xlsx_questionnaire(path: Path, config: FormatConfig) -> list[Question]
         q_text = str(row[q_idx] or "").strip()
         if not q_text:
             continue
-        # Try to extract major/minor from preceding columns
         major = str(row[1] or "").strip() if len(row) > 1 else ""
         minor = str(row[2] or "").strip() if len(row) > 2 else ""
+        choices = str(row[c_idx] or "").strip() if 0 <= c_idx < len(row) else ""
+        remarks = str(row[r_idx] or "").strip() if 0 <= r_idx < len(row) else ""
         questions.append(Question(
             question_no=i,
             question_text=q_text,
             major=major,
             minor=minor,
+            choices_text=choices,
+            remarks_text=remarks,
         ))
 
     wb.close()
@@ -76,6 +86,8 @@ def _read_docx_questionnaire(path: Path, config: FormatConfig) -> list[Question]
 
     table = doc.tables[config.table_index]
     q_idx = _col_letter_to_index(config.question_col)
+    c_idx = _col_letter_to_index(config.choices_col) if config.choices_col else -1
+    r_idx = _col_letter_to_index(config.remarks_col) if config.remarks_col else -1
 
     questions = []
     no = 0
@@ -91,11 +103,15 @@ def _read_docx_questionnaire(path: Path, config: FormatConfig) -> list[Question]
         no += 1
         major = cells[1].text.strip() if len(cells) > 1 else ""
         minor = cells[2].text.strip() if len(cells) > 2 else ""
+        choices = cells[c_idx].text.strip() if 0 <= c_idx < len(cells) else ""
+        remarks = cells[r_idx].text.strip() if 0 <= r_idx < len(cells) else ""
         questions.append(Question(
             question_no=no,
             question_text=q_text,
             major=major,
             minor=minor,
+            choices_text=choices,
+            remarks_text=remarks,
         ))
 
     return questions

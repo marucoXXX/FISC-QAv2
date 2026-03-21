@@ -53,6 +53,9 @@ class BankQaFileCreate(BaseModel):
     header_row: int = 1
     data_start_row: int = 2
     table_index: int = 0
+    format_type: str = "freetext"
+    choices_col: str = ""
+    remarks_col: str = ""
 
 class BankQaFileUpdate(BaseModel):
     qa_file_name: Optional[str] = None
@@ -62,6 +65,9 @@ class BankQaFileUpdate(BaseModel):
     header_row: Optional[int] = None
     data_start_row: Optional[int] = None
     table_index: Optional[int] = None
+    format_type: Optional[str] = None
+    choices_col: Optional[str] = None
+    remarks_col: Optional[str] = None
 
 class CommonAnswerCreate(BaseModel):
     question_pattern: str
@@ -152,6 +158,7 @@ def create_router(
                 db_path, bank_id, req.qa_file_name, req.file_format,
                 req.question_col, req.answer_col, req.header_row,
                 req.data_start_row, req.table_index,
+                req.format_type, req.choices_col, req.remarks_col,
             )
         except Exception as e:
             if "UNIQUE" in str(e):
@@ -314,6 +321,9 @@ def create_router(
             header_row=qf["header_row"] if qf else 1,
             data_start_row=qf["data_start_row"] if qf else 2,
             table_index=qf["table_index"] if qf else 0,
+            format_type=qf["format_type"] if qf else "freetext",
+            choices_col=qf["choices_col"] if qf else "",
+            remarks_col=qf["remarks_col"] if qf else "",
         )
         questions = read_questionnaire(stored_path, fc)
         if not questions:
@@ -321,7 +331,8 @@ def create_router(
 
         db.bulk_add_session_questions(db_path, session_id, [
             {"question_no": q.question_no, "major": q.major,
-             "minor": q.minor, "question_text": q.question_text}
+             "minor": q.minor, "question_text": q.question_text,
+             "choices_text": q.choices_text, "remarks_text": q.remarks_text}
             for q in questions
         ])
 
@@ -575,6 +586,9 @@ def create_router(
                 header_row=session["header_row"] or 1,
                 data_start_row=session["data_start_row"] or 2,
                 table_index=session["table_index"] or 0,
+                format_type=session.get("format_type") or "freetext",
+                choices_col=session.get("choices_col") or "",
+                remarks_col=session.get("remarks_col") or "",
             )
             output_dir = Path(config.output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -906,12 +920,14 @@ def _extract_qa_pairs(content: bytes, filename: str, qf: dict | None) -> list[di
     a_col = qf["answer_col"] if qf else "E"
     header_row = qf["header_row"] if qf else 1
     data_start = qf["data_start_row"] if qf else 2
+    c_col = qf.get("choices_col", "") if qf else ""
+    r_col = qf.get("remarks_col", "") if qf else ""
 
     if filename.endswith(".xlsx"):
-        return _extract_qa_from_excel(content, q_col, a_col, header_row, data_start)
+        return _extract_qa_from_excel(content, q_col, a_col, header_row, data_start, c_col, r_col)
     elif filename.endswith(".docx"):
         table_index = qf["table_index"] if qf else 0
-        return _extract_qa_from_docx(content, table_index, q_col, a_col, data_start)
+        return _extract_qa_from_docx(content, table_index, q_col, a_col, data_start, c_col, r_col)
     else:
         return []
 
@@ -926,6 +942,7 @@ def _col_letter_to_index(col: str) -> int:
 
 def _extract_qa_from_excel(
     content: bytes, q_col: str, a_col: str, header_row: int, data_start: int,
+    c_col: str = "", r_col: str = "",
 ) -> list[dict]:
     from openpyxl import load_workbook
 
@@ -933,6 +950,8 @@ def _extract_qa_from_excel(
     ws = wb.active
     q_idx = _col_letter_to_index(q_col)
     a_idx = _col_letter_to_index(a_col)
+    c_idx = _col_letter_to_index(c_col) if c_col else -1
+    r_idx = _col_letter_to_index(r_col) if r_col else -1
 
     pairs = []
     for row in ws.iter_rows(min_row=data_start, values_only=True):
@@ -941,7 +960,12 @@ def _extract_qa_from_excel(
         q_text = str(row[q_idx] or "").strip()
         a_text = str(row[a_idx] or "").strip()
         if q_text and a_text:
-            pairs.append({"question_text": q_text, "answer_text": a_text})
+            pair: dict = {"question_text": q_text, "answer_text": a_text}
+            if 0 <= c_idx < len(row):
+                pair["choices_text"] = str(row[c_idx] or "").strip()
+            if 0 <= r_idx < len(row):
+                pair["remarks_text"] = str(row[r_idx] or "").strip()
+            pairs.append(pair)
 
     wb.close()
     return pairs
@@ -949,6 +973,7 @@ def _extract_qa_from_excel(
 
 def _extract_qa_from_docx(
     content: bytes, table_index: int, q_col: str, a_col: str, data_start: int,
+    c_col: str = "", r_col: str = "",
 ) -> list[dict]:
     from docx import Document
 
@@ -959,6 +984,8 @@ def _extract_qa_from_docx(
     table = doc.tables[table_index]
     q_idx = _col_letter_to_index(q_col)
     a_idx = _col_letter_to_index(a_col)
+    c_idx = _col_letter_to_index(c_col) if c_col else -1
+    r_idx = _col_letter_to_index(r_col) if r_col else -1
 
     pairs = []
     for i, row in enumerate(table.rows):
@@ -970,6 +997,11 @@ def _extract_qa_from_docx(
         q_text = cells[q_idx].text.strip()
         a_text = cells[a_idx].text.strip()
         if q_text and a_text:
-            pairs.append({"question_text": q_text, "answer_text": a_text})
+            pair: dict = {"question_text": q_text, "answer_text": a_text}
+            if 0 <= c_idx < len(cells):
+                pair["choices_text"] = cells[c_idx].text.strip()
+            if 0 <= r_idx < len(cells):
+                pair["remarks_text"] = cells[r_idx].text.strip()
+            pairs.append(pair)
 
     return pairs

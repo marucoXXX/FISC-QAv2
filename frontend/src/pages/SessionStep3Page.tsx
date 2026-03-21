@@ -127,12 +127,12 @@ export default function SessionStep3Page() {
                 return (
                   <TableRow key={q.question_no} className={!hasMatch ? "opacity-50" : ""}>
                     <TableCell className="font-mono text-xs">{q.question_no}</TableCell>
-                    <TableCell className="text-sm max-w-xs">
-                      <div className="line-clamp-3">{q.question_text}</div>
+                    <TableCell className="text-sm">
+                      <div className="whitespace-pre-wrap">{q.question_text}</div>
                     </TableCell>
-                    <TableCell className="text-sm max-w-xs">
+                    <TableCell className="text-sm">
                       {hasMatch ? (
-                        <div className="line-clamp-3">{q.common_answer_text}</div>
+                        <div className="whitespace-pre-wrap">{q.common_answer_text}</div>
                       ) : (
                         <span className="text-muted-foreground italic">共通回答なし</span>
                       )}
