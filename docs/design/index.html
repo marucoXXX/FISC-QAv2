@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FISC-QAv2 設計書</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-alt: #f8f9fa;
+    --bg-code: #f1f3f5;
+    --text: #1a1a2e;
+    --text-secondary: #495057;
+    --border: #dee2e6;
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --green: #059669;
+    --green-light: #d1fae5;
+    --purple: #7c3aed;
+    --purple-light: #ede9fe;
+    --orange: #d97706;
+    --orange-light: #fef3c7;
+    --red: #dc2626;
+    --red-light: #fee2e2;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --radius: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    color: white;
+    padding: 48px 0 40px;
+    text-align: center;
+  }
+  .header h1 { font-size: 2rem; font-weight: 700; letter-spacing: 0.02em; }
+  .header p { margin-top: 8px; opacity: 0.85; font-size: 1rem; }
+  .header .meta {
+    margin-top: 16px;
+    font-size: 0.85rem;
+    opacity: 0.7;
+  }
+
+  /* Nav */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .nav-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-inner::-webkit-scrollbar { display: none; }
+  .nav a {
+    display: block;
+    padding: 12px 20px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .nav a:hover, .nav a.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* Layout */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  section {
+    padding: 48px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  section:last-child { border-bottom: none; }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .num {
+    background: var(--accent);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+  }
+  .section-desc {
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+    font-size: 0.95rem;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 28px 0 12px;
+    color: var(--text);
+  }
+  h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 20px 0 8px;
+    color: var(--text-secondary);
+  }
+
+  p { margin-bottom: 12px; }
+
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 16px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  th, td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: var(--bg-alt);
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8f9ff; }
+
+  /* Code */
+  code {
+    background: var(--bg-code);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+  }
+  pre {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 20px;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    margin: 16px 0;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+  }
+
+  /* Cards */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    background: var(--bg);
+  }
+  .card h4 { margin-top: 0; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.6;
+  }
+  .badge-blue { background: var(--accent-light); color: var(--accent); }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-purple { background: var(--purple-light); color: var(--purple); }
+  .badge-orange { background: var(--orange-light); color: var(--orange); }
+  .badge-red { background: var(--red-light); color: var(--red); }
+  .badge-gray { background: #f3f4f6; color: #6b7280; }
+
+  /* Method badges */
+  .method {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: monospace;
+    letter-spacing: 0.03em;
+    min-width: 52px;
+    text-align: center;
+  }
+  .method-get { background: #d1fae5; color: #065f46; }
+  .method-post { background: #dbeafe; color: #1e40af; }
+  .method-put { background: #fef3c7; color: #92400e; }
+  .method-delete { background: #fee2e2; color: #991b1b; }
+
+  /* Diagram boxes */
+  .diagram {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin: 16px 0;
+    text-align: center;
+  }
+  .flow-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .flow-step {
+    background: white;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 12px 18px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-align: center;
+    min-width: 140px;
+  }
+  .flow-step.active {
+    background: var(--accent);
+    color: white;
+  }
+  .flow-arrow {
+    color: var(--accent);
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+
+  /* Agent pipeline */
+  .agent-pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .agent-box {
+    border: 2px solid;
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+    min-width: 150px;
+    flex: 1;
+    max-width: 200px;
+  }
+  .agent-box .agent-id { font-size: 0.72rem; font-weight: 700; opacity: 0.6; }
+  .agent-box .agent-name { font-size: 0.9rem; font-weight: 700; margin: 4px 0; }
+  .agent-box .agent-desc { font-size: 0.75rem; opacity: 0.8; }
+  .agent-box.orch { border-color: #6366f1; background: #eef2ff; color: #4338ca; }
+  .agent-box.idx { border-color: #0891b2; background: #ecfeff; color: #155e75; }
+  .agent-box.rtr { border-color: #d97706; background: #fffbeb; color: #92400e; }
+  .agent-box.rdr { border-color: #059669; background: #ecfdf5; color: #065f46; }
+  .agent-box.rev { border-color: #dc2626; background: #fef2f2; color: #991b1b; }
+  .pipe-arrow {
+    display: flex;
+    align-items: center;
+    font-size: 1.3rem;
+    color: #94a3b8;
+    padding: 0 2px;
+  }
+
+  /* ER diagram style */
+  .er-entity {
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    margin: 16px 0;
+    overflow: hidden;
+  }
+  .er-entity-header {
+    background: var(--accent);
+    color: white;
+    padding: 8px 14px;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+  .er-entity-body { padding: 0; }
+  .er-entity-body table { margin: 0; }
+  .er-entity-body th { font-size: 0.75rem; }
+
+  /* Screen mockups */
+  .screen-mock {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin: 16px 0;
+    background: white;
+  }
+  .screen-titlebar {
+    background: var(--bg-alt);
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .screen-titlebar .dots {
+    display: flex;
+    gap: 4px;
+  }
+  .screen-titlebar .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #d1d5db;
+  }
+  .screen-body {
+    padding: 20px;
+    font-size: 0.85rem;
+  }
+
+  /* List */
+  ul, ol {
+    margin: 8px 0 12px 20px;
+  }
+  li { margin-bottom: 4px; }
+
+  /* Two-column */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
+    .agent-pipeline { flex-direction: column; align-items: center; }
+    .pipe-arrow { transform: rotate(90deg); }
+  }
+
+  /* Info box */
+  .info-box {
+    background: #eff6ff;
+    border-left: 4px solid var(--accent);
+    padding: 14px 18px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 16px 0;
+    font-size: 0.9rem;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 32px 0;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    background: var(--bg-alt);
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- HEADER                                                        -->
+<!-- ============================================================ -->
+<div class="header">
+  <div class="container">
+    <h1>FISC-QAv2 設計書</h1>
+    <p>FISCアンケート自動回答システム &mdash; 包括的設計ドキュメント</p>
+    <div class="meta">ステラアイズ株式会社 | プロジェクト: izanagi | 最終更新: 2026-03-21</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- NAV                                                           -->
+<!-- ============================================================ -->
+<div class="nav">
+  <div class="nav-inner">
+    <a href="#overview">概要</a>
+    <a href="#architecture">アーキテクチャ</a>
+    <a href="#data-model">データモデル</a>
+    <a href="#api-design">API設計</a>
+    <a href="#screen-design">画面設計</a>
+    <a href="#agent-design">エージェント設計</a>
+    <a href="#user-guide">ユーザ操作説明</a>
+    <a href="#security">セキュリティ</a>
+    <a href="#infra">インフラ構成</a>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============================================================ -->
+<!-- 0. OVERVIEW                                                   -->
+<!-- ============================================================ -->
+<section id="overview">
+  <h2><span class="num">0</span> システム概要</h2>
+  <p class="section-desc">FISC-QAv2は、金融情報システムセンター（FISC）の金融機関向けアンケートに対し、社内ドキュメントを根拠としてAIが回答案を自動生成するシステムです。</p>
+
+  <div class="two-col">
+    <div class="card">
+      <h4>入力</h4>
+      <ul>
+        <li>FISCアンケート回答票（Excel / Word）</li>
+        <li>社内ポリシー・過去回答・設計書（KB: 数百ファイル対応）</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>出力</h4>
+      <ul>
+        <li>回答済みExcel / Word（元ファイルに回答を記入）</li>
+        <li>回答・根拠・信頼度スコア</li>
+        <li>過去回答DB・共通回答DBへの自動蓄積</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>技術スタック</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>レイヤー</th><th>技術</th></tr></thead>
+      <tbody>
+        <tr><td>Frontend</td><td>React 19 + Vite + TypeScript + shadcn/ui + Tailwind CSS v4</td></tr>
+        <tr><td>Backend</td><td>FastAPI + Python 3.11</td></tr>
+        <tr><td>Database</td><td>SQLite（ローカル）/ Google Cloud Datastore（本番KVS）</td></tr>
+        <tr><td>AI Model</td><td>Claude Sonnet 4 (Reader/Reviewer) / Claude Haiku (Router) / GPT-5.2 (Common Matching)</td></tr>
+        <tr><td>認証</td><td>Azure AD / MSAL（ホワイトリスト制）</td></tr>
+        <tr><td>Deploy</td><td>Google App Engine Standard</td></tr>
+        <tr><td>Storage</td><td>Google Cloud Storage（ファイルアップロード）</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 1. ARCHITECTURE                                               -->
+<!-- ============================================================ -->
+<section id="architecture">
+  <h2><span class="num">1</span> システムアーキテクチャ</h2>
+  <p class="section-desc">Sequential + Concurrent マルチエージェント構成（Microsoft Azure Architecture Center パターン準拠）</p>
+
+  <h3>全体構成図</h3>
+  <pre><code>                       +-----------+
+                       |  Frontend |  React + Vite
+                       |  :5173    |  (SPA)
+                       +-----+-----+
+                             |
+                        HTTP/REST
+                             |
+                       +-----+-----+
+                       |  Backend  |  FastAPI
+                       |  :8000    |
+                       +-----+-----+
+                          /     \
+                    +----+       +----+
+                    |                 |
+              +-----+-----+   +------+------+
+              | Auth API   |   | Business    |
+              | /api/auth  |   | API         |
+              +------------+   | /api/banks  |
+                               | /api/sessions|
+                               +------+------+
+                                      |
+                          +-----------+-----------+
+                          |                       |
+                    +-----+-----+          +------+------+
+                    |  SQLite   |          |  AI Pipeline |
+                    |  (Review  |          |  (src/)      |
+                    |   DB)     |          +--------------+
+                    +-----------+          | Orchestrator |
+                                           | Indexer      |
+                                           | Router       |
+                                           | Reader(s)    |
+                                           | Reviewer     |
+                                           +--------------+
+</code></pre>
+
+  <h3>ディレクトリ構成</h3>
+  <pre><code>FISC-QAv2/
++-- backend/               # FastAPI アプリケーション
+|   +-- app/
+|       +-- main.py        # エントリポイント
+|       +-- config.py      # 設定（Secret Manager連携）
+|       +-- dependencies/  # 認証ミドルウェア
+|       +-- routers/       # APIエンドポイント（auth）
+|       +-- schemas/       # Pydantic スキーマ
+|       +-- services/      # ファイル保存・テキスト抽出
+|       +-- repositories/  # データアクセス
++-- frontend/              # React SPA
+|   +-- src/
+|       +-- pages/         # 10画面
+|       +-- components/    # UI + Layout
+|       +-- hooks/         # useAuth, useTheme
+|       +-- lib/           # httpClient, utils
++-- src/                   # AIエージェントパイプライン
+|   +-- orchestrator.py    # Agent 0: パイプライン制御
+|   +-- indexer.py         # Agent 1: KB インデックス
+|   +-- router.py          # Agent 2: 質問ルーティング
+|   +-- reader.py          # Agent 3: 回答生成
+|   +-- reviewer.py        # Agent 4: 品質レビュー
+|   +-- matcher.py         # 過去回答/共通回答マッチング
+|   +-- models.py          # 共通データモデル
+|   +-- config.py          # パイプライン設定
+|   +-- excel_io.py        # Excel入出力
+|   +-- file_io.py         # 汎用ファイル入出力
+|   +-- web/
+|       +-- app.py         # ビジネスAPIルーター
+|       +-- db.py          # SQLite DB層
+|       +-- pipeline.py    # バックグラウンドジョブ管理
++-- config/manifest.json   # GCP設定
++-- docs/                  # ドキュメント
++-- kb/                    # ナレッジベース（社内資料）
+</code></pre>
+</section>
+
+<!-- ============================================================ -->
+<!-- 2. DATA MODEL                                                 -->
+<!-- ============================================================ -->
+<section id="data-model">
+  <h2><span class="num">2</span> データモデル</h2>
+  <p class="section-desc">SQLiteベースのリレーショナルデータベース。銀行管理、セッション管理、回答蓄積の3つのドメインで構成されます。</p>
+
+  <h3>ER概念図</h3>
+  <pre><code>  banks 1---* bank_qa_files     banks 1---* past_qa
+    |                              |
+    | 1                            |
+    |                              |
+    * sessions 1---* session_questions
+    |                    |
+    |                    *---? past_qa (matched)
+    |                    *---? common_answers (matched)
+    |
+    *--- uploaded_files
+
+  common_answers (独立テーブル、全銀行共通)
+
+  runs 1---* answers            runs 1---* review_notes
+  (レガシー: パイプライン直接出力用)
+</code></pre>
+
+  <h3>2.1 banks（銀行マスタ）</h3>
+  <div class="er-entity">
+    <div class="er-entity-header">banks</div>
+    <div class="er-entity-body">
+      <div class="table-wrap" style="border:none; margin:0;">
+        <table>
+          <thead><tr><th>カラム</th><th>型</th><th>制約</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>INTEGER</td><td>PK, AUTO</td><td>銀行ID</td></tr>
+            <tr><td><code>name</code></td><td>TEXT</td><td>NOT NULL, UNIQUE</td><td>銀行名（例: みずほ銀行）</td></tr>
+            <tr><td><code>code</code></td><td>TEXT</td><td>NOT NULL, UNIQUE</td><td>銀行コード（例: mizuho）</td></tr>
+            <tr><td><code>notes</code></td><td>TEXT</td><td>DEFAULT ''</td><td>メモ</td></tr>
+            <tr><td><code>created_at</code></td><td>TEXT</td><td>NOT NULL</td><td>作成日時 (ISO8601)</td></tr>
+            <tr><td><code>updated_at</code></td><td>TEXT</td><td>NOT NULL</td><td>更新日時 (ISO8601)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h3>2.2 bank_qa_files（銀行別QAファイル定義）</h3>
+  <div class="er-entity">
+    <div class="er-entity-header">bank_qa_files</div>
+    <div class="er-entity-body">
+      <div class="table-wrap" style="border:none; margin:0;">
+        <table>
+          <thead><tr><th>カラム</th><th>型</th><th>制約</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>INTEGER</td><td>PK, AUTO</td><td>QAファイルID</td></tr>
+            <tr><td><code>bank_id</code></td><td>INTEGER</td><td>FK(banks.id)</td><td>銀行ID</td></tr>
+            <tr><td><code>qa_file_name</code></td><td>TEXT</td><td>NOT NULL</td><td>ファイル名称</td></tr>
+            <tr><td><code>file_format</code></td><td>TEXT</td><td>DEFAULT 'xlsx'</td><td>形式（xlsx / docx）</td></tr>
+            <tr><td><code>question_col</code></td><td>TEXT</td><td>DEFAULT 'D'</td><td>質問列</td></tr>
+            <tr><td><code>answer_col</code></td><td>TEXT</td><td>DEFAULT 'E'</td><td>回答列</td></tr>
+            <tr><td><code>header_row</code></td><td>INTEGER</td><td>DEFAULT 1</td><td>ヘッダー行</td></tr>
+            <tr><td><code>data_start_row</code></td><td>INTEGER</td><td>DEFAULT 2</td><td>データ開始行</td></tr>
+            <tr><td><code>table_index</code></td><td>INTEGER</td><td>DEFAULT 0</td><td>テーブル番号（Word用）</td></tr>
+            <tr><td><code>format_type</code></td><td>TEXT</td><td>DEFAULT 'freetext'</td><td>回答形式（freetext / choices / assessment）</td></tr>
+            <tr><td><code>choices_col</code></td><td>TEXT</td><td>DEFAULT ''</td><td>選択肢列</td></tr>
+            <tr><td><code>remarks_col</code></td><td>TEXT</td><td>DEFAULT ''</td><td>備考列</td></tr>
+            <tr><td><code>created_at / updated_at</code></td><td>TEXT</td><td>NOT NULL</td><td>タイムスタンプ</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h3>2.3 sessions（セッション）</h3>
+  <div class="info-box">セッションは5ステップワークフローの実行単位です。1つの銀行 + 1つの質問票ファイルに対応します。</div>
+  <div class="er-entity">
+    <div class="er-entity-header">sessions</div>
+    <div class="er-entity-body">
+      <div class="table-wrap" style="border:none; margin:0;">
+        <table>
+          <thead><tr><th>カラム</th><th>型</th><th>制約</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>INTEGER</td><td>PK, AUTO</td><td>セッションID</td></tr>
+            <tr><td><code>bank_id</code></td><td>INTEGER</td><td>FK(banks.id)</td><td>対象銀行</td></tr>
+            <tr><td><code>qa_file_id</code></td><td>INTEGER</td><td>FK(bank_qa_files.id), NULL可</td><td>QAファイル定義</td></tr>
+            <tr><td><code>name</code></td><td>TEXT</td><td>NOT NULL</td><td>セッション名</td></tr>
+            <tr><td><code>current_step</code></td><td>INTEGER</td><td>DEFAULT 1</td><td>現在のステップ (1-5)</td></tr>
+            <tr><td><code>status</code></td><td>TEXT</td><td>DEFAULT 'in_progress'</td><td>状態 (in_progress / completed)</td></tr>
+            <tr><td><code>source_file_name</code></td><td>TEXT</td><td></td><td>元ファイル名</td></tr>
+            <tr><td><code>source_file_path</code></td><td>TEXT</td><td></td><td>保存パス</td></tr>
+            <tr><td><code>created_at / updated_at</code></td><td>TEXT</td><td>NOT NULL</td><td>タイムスタンプ</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h3>2.4 session_questions（セッション質問）</h3>
+  <div class="er-entity">
+    <div class="er-entity-header">session_questions</div>
+    <div class="er-entity-body">
+      <div class="table-wrap" style="border:none; margin:0;">
+        <table>
+          <thead><tr><th>カラム</th><th>型</th><th>制約</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>INTEGER</td><td>PK, AUTO</td><td>レコードID</td></tr>
+            <tr><td><code>session_id</code></td><td>INTEGER</td><td>FK(sessions.id)</td><td>セッション</td></tr>
+            <tr><td><code>question_no</code></td><td>INTEGER</td><td>UNIQUE(session_id, question_no)</td><td>質問番号</td></tr>
+            <tr><td><code>major / minor</code></td><td>TEXT</td><td></td><td>大分類 / 小分類</td></tr>
+            <tr><td><code>question_text</code></td><td>TEXT</td><td></td><td>質問文</td></tr>
+            <tr><td><code>choices_text</code></td><td>TEXT</td><td></td><td>選択肢（あれば）</td></tr>
+            <tr><td><code>remarks_text</code></td><td>TEXT</td><td></td><td>備考（あれば）</td></tr>
+            <tr><td><code>answer_source</code></td><td>TEXT</td><td>DEFAULT 'pending'</td><td>
+              回答ソース:
+              <span class="badge badge-gray">pending</span>
+              <span class="badge badge-blue">past_match</span>
+              <span class="badge badge-purple">common_match</span>
+              <span class="badge badge-green">generated</span>
+              <span class="badge badge-orange">manual</span>
+            </td></tr>
+            <tr><td><code>answer_text</code></td><td>TEXT</td><td></td><td>回答テキスト</td></tr>
+            <tr><td><code>source_references</code></td><td>TEXT (JSON)</td><td>DEFAULT '[]'</td><td>参照元リスト</td></tr>
+            <tr><td><code>confidence</code></td><td>TEXT</td><td></td><td>信頼度 (high / medium / low)</td></tr>
+            <tr><td><code>matched_past_qa_id</code></td><td>INTEGER</td><td>FK(past_qa.id), NULL可</td><td>マッチした過去Q&A</td></tr>
+            <tr><td><code>past_question_text / past_answer_text</code></td><td>TEXT</td><td></td><td>マッチした過去Q&Aのスナップショット</td></tr>
+            <tr><td><code>matched_common_id</code></td><td>INTEGER</td><td>FK(common_answers.id), NULL可</td><td>マッチした共通回答</td></tr>
+            <tr><td><code>common_answer_text</code></td><td>TEXT</td><td></td><td>共通回答のスナップショット</td></tr>
+            <tr><td><code>user_confirmed</code></td><td>INTEGER</td><td>DEFAULT 0</td><td>ユーザ確認 (0=未, 1=採用, -1=却下)</td></tr>
+            <tr><td><code>step_resolved</code></td><td>INTEGER</td><td>DEFAULT 0</td><td>解決ステップ (2/3/4/5)</td></tr>
+            <tr><td><code>add_to_common</code></td><td>INTEGER</td><td>DEFAULT 0</td><td>共通回答DBに追加フラグ</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h3>2.5 past_qa（過去Q&Aペア）</h3>
+  <div class="er-entity">
+    <div class="er-entity-header">past_qa</div>
+    <div class="er-entity-body">
+      <div class="table-wrap" style="border:none; margin:0;">
+        <table>
+          <thead><tr><th>カラム</th><th>型</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>INTEGER PK</td><td>ID</td></tr>
+            <tr><td><code>bank_id</code></td><td>INTEGER FK</td><td>銀行ID</td></tr>
+            <tr><td><code>question_text</code></td><td>TEXT</td><td>過去の質問文</td></tr>
+            <tr><td><code>answer_text</code></td><td>TEXT</td><td>過去の回答文</td></tr>
+            <tr><td><code>choices_text</code></td><td>TEXT</td><td>選択肢</td></tr>
+            <tr><td><code>remarks_text</code></td><td>TEXT</td><td>備考</td></tr>
+            <tr><td><code>source_file</code></td><td>TEXT</td><td>元ファイル名</td></tr>
+            <tr><td><code>created_at</code></td><td>TEXT</td><td>作成日時</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h3>2.6 common_answers（共通回答DB）</h3>
+  <div class="er-entity">
+    <div class="er-entity-header">common_answers</div>
+    <div class="er-entity-body">
+      <div class="table-wrap" style="border:none; margin:0;">
+        <table>
+          <thead><tr><th>カラム</th><th>型</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>INTEGER PK</td><td>ID</td></tr>
+            <tr><td><code>question_pattern</code></td><td>TEXT</td><td>質問パターン</td></tr>
+            <tr><td><code>answer_text</code></td><td>TEXT</td><td>共通回答</td></tr>
+            <tr><td><code>category</code></td><td>TEXT</td><td>カテゴリ</td></tr>
+            <tr><td><code>source</code></td><td>TEXT</td><td>出典</td></tr>
+            <tr><td><code>created_at / updated_at</code></td><td>TEXT</td><td>タイムスタンプ</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h3>2.7 AIパイプライン共通データモデル（Python dataclass）</h3>
+  <pre><code>class Confidence(str, Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+@dataclass
+class Question:
+    no: int              # 質問番号
+    major: str           # 大分類
+    minor: str           # 小分類
+    question: str        # 質問文
+
+@dataclass
+class IndexEntry:
+    file_name: str       # ファイル名
+    path: str            # パス
+    category: str        # カテゴリ
+    summary: str         # 500文字要約
+    estimated_tokens: int # 推定トークン数
+    last_modified: str   # 最終更新日時
+    updated: bool        # 前回から更新あり
+
+@dataclass
+class ReaderAssignment:
+    reader_id: str       # Reader ID (A, B, C...)
+    questions: list[int] # 担当質問番号
+    files: list[str]     # 担当ファイルパス
+    estimated_tokens: int # 推定合計トークン数
+
+@dataclass
+class Answer:
+    question_no: int     # 質問番号
+    answer: str          # 回答文
+    status: str          # ステータス
+    source_references: list[str]  # 参照元
+    confidence: str      # 信頼度
+    key_excerpt: str     # 根拠抜粋
+    flag: str | None     # フラグ
+
+@dataclass
+class ReviewNote:
+    question_no: int     # 質問番号
+    issue_type: str      # 問題タイプ
+    severity: str        # 深刻度 (high/medium/low)
+    description: str     # 説明
+    suggestion: str      # 改善提案</code></pre>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3. API DESIGN                                                 -->
+<!-- ============================================================ -->
+<section id="api-design">
+  <h2><span class="num">3</span> API設計</h2>
+  <p class="section-desc">RESTful API。ベースURL: <code>http://localhost:8000</code>。全エンドポイントは <code>/api</code> プレフィクス。</p>
+
+  <h3>3.1 認証 API</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>メソッド</th><th>パス</th><th>説明</th><th>認証</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method method-post">POST</span></td><td><code>/api/auth/login</code></td><td>ログイン（メールアドレス送信 &rarr; Base64トークン返却）</td><td>不要</td></tr>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/auth/me</code></td><td>現在ログイン中のユーザ情報取得</td><td>Bearer Token</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>POST /api/auth/login</h4>
+  <pre><code>// Request
+{ "email": "user@example.com" }
+
+// Response 200
+{
+  "user": { "id": "user@example.com", "email": "user@example.com",
+            "first_name": "user", "last_name": "" },
+  "token": "dXNlckBleGFtcGxlLmNvbQ=="
+}
+
+// Response 403 (ホワイトリスト外)
+{ "detail": "このメールアドレスはログインが許可されていません" }</code></pre>
+
+  <h3>3.2 銀行管理 API</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>メソッド</th><th>パス</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/banks</code></td><td>銀行一覧（past_qa_count, qa_file_count付き）</td></tr>
+        <tr><td><span class="method method-post">POST</span></td><td><code>/api/banks</code></td><td>銀行作成</td></tr>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/banks/{bank_id}</code></td><td>銀行詳細取得</td></tr>
+        <tr><td><span class="method method-put">PUT</span></td><td><code>/api/banks/{bank_id}</code></td><td>銀行更新</td></tr>
+        <tr><td><span class="method method-delete">DELETE</span></td><td><code>/api/banks/{bank_id}</code></td><td>銀行削除（カスケード）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3.3 QAファイル定義 API</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>メソッド</th><th>パス</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/banks/{bank_id}/qa-files</code></td><td>QAファイル一覧</td></tr>
+        <tr><td><span class="method method-post">POST</span></td><td><code>/api/banks/{bank_id}/qa-files</code></td><td>QAファイル定義作成（列マッピング設定）</td></tr>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/banks/{bank_id}/qa-files/{qa_file_id}</code></td><td>QAファイル詳細</td></tr>
+        <tr><td><span class="method method-put">PUT</span></td><td><code>/api/banks/{bank_id}/qa-files/{qa_file_id}</code></td><td>QAファイル更新</td></tr>
+        <tr><td><span class="method method-delete">DELETE</span></td><td><code>/api/banks/{bank_id}/qa-files/{qa_file_id}</code></td><td>QAファイル削除</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3.4 過去回答 API</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>メソッド</th><th>パス</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/banks/{bank_id}/past-answers</code></td><td>過去Q&A一覧</td></tr>
+        <tr><td><span class="method method-post">POST</span></td><td><code>/api/banks/{bank_id}/past-answers/upload</code></td><td>Excel/Wordから過去Q&Aを一括インポート（multipart/form-data）</td></tr>
+        <tr><td><span class="method method-delete">DELETE</span></td><td><code>/api/banks/{bank_id}/past-answers/{past_qa_id}</code></td><td>過去Q&A削除</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3.5 共通回答DB API</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>メソッド</th><th>パス</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/common-answers?category=&amp;search=</code></td><td>共通回答一覧（フィルタ・検索対応）</td></tr>
+        <tr><td><span class="method method-post">POST</span></td><td><code>/api/common-answers</code></td><td>共通回答作成</td></tr>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/common-answers/{common_id}</code></td><td>共通回答詳細</td></tr>
+        <tr><td><span class="method method-put">PUT</span></td><td><code>/api/common-answers/{common_id}</code></td><td>共通回答更新</td></tr>
+        <tr><td><span class="method method-delete">DELETE</span></td><td><code>/api/common-answers/{common_id}</code></td><td>共通回答削除</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3.6 セッション API（5ステップワークフロー）</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>メソッド</th><th>パス</th><th>説明</th><th>Step</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/sessions</code></td><td>セッション一覧</td><td>-</td></tr>
+        <tr><td><span class="method method-post">POST</span></td><td><code>/api/sessions?bank_id=&amp;qa_file_id=</code></td><td>セッション作成 + 質問抽出（multipart/form-data）</td><td>1</td></tr>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}</code></td><td>セッション詳細（銀行情報、QAファイル設定含む）</td><td>-</td></tr>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}/questions</code></td><td>全質問一覧</td><td>-</td></tr>
+        <tr style="background:#f0f0ff;"><td><span class="method method-post">POST</span></td><td><code>/api/sessions/{id}/step2/match</code></td><td>過去回答マッチング実行</td><td>2</td></tr>
+        <tr style="background:#f0f0ff;"><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}/step2/results</code></td><td>Step2マッチング結果取得</td><td>2</td></tr>
+        <tr style="background:#f0f0ff;"><td><span class="method method-put">PUT</span></td><td><code>/api/sessions/{id}/step2/confirm</code></td><td>Step2確定（採用/却下判定）</td><td>2</td></tr>
+        <tr style="background:#f5f0ff;"><td><span class="method method-post">POST</span></td><td><code>/api/sessions/{id}/step3/match</code></td><td>共通回答マッチング実行</td><td>3</td></tr>
+        <tr style="background:#f5f0ff;"><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}/step3/results</code></td><td>Step3マッチング結果取得</td><td>3</td></tr>
+        <tr style="background:#f5f0ff;"><td><span class="method method-put">PUT</span></td><td><code>/api/sessions/{id}/step3/confirm</code></td><td>Step3確定</td><td>3</td></tr>
+        <tr style="background:#f0fff0;"><td><span class="method method-post">POST</span></td><td><code>/api/sessions/{id}/step4/generate</code></td><td>AI回答生成ジョブ開始</td><td>4</td></tr>
+        <tr style="background:#f0fff0;"><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}/step4/progress/{job_id}</code></td><td>SSE: 生成進捗ストリーム</td><td>4</td></tr>
+        <tr style="background:#f0fff0;"><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}/step4/status/{job_id}</code></td><td>ジョブ状態取得（ポーリング用）</td><td>4</td></tr>
+        <tr style="background:#fff8f0;"><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}/step5/summary</code></td><td>最終サマリー（統計+全質問）</td><td>5</td></tr>
+        <tr style="background:#fff8f0;"><td><span class="method method-put">PUT</span></td><td><code>/api/sessions/{id}/questions/{q_no}</code></td><td>回答テキスト編集</td><td>5</td></tr>
+        <tr style="background:#fff8f0;"><td><span class="method method-put">PUT</span></td><td><code>/api/sessions/{id}/step5/finalize</code></td><td>確定: 過去回答DBに蓄積 + 共通回答DB追加</td><td>5</td></tr>
+        <tr style="background:#fff8f0;"><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}/export</code></td><td>回答済みExcel/Wordダウンロード</td><td>5</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3.7 その他</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>メソッド</th><th>パス</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/health</code></td><td>ヘルスチェック</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 4. SCREEN DESIGN                                              -->
+<!-- ============================================================ -->
+<section id="screen-design">
+  <h2><span class="num">4</span> 画面設計</h2>
+  <p class="section-desc">React SPA（10画面）。shadcn/ui + Tailwind CSS。サイドバーナビゲーション + ステップインジケーター。</p>
+
+  <h3>画面一覧・ルーティング</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>パス</th><th>画面名</th><th>コンポーネント</th><th>認証</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><code>/login</code></td><td>ログイン</td><td>LoginPage</td><td>不要</td><td>メールアドレスでログイン</td></tr>
+        <tr><td><code>/banks</code></td><td>銀行管理</td><td>BankListPage</td><td>必要</td><td>銀行+QAファイルの一覧・CRUD</td></tr>
+        <tr><td><code>/banks/:bankId</code></td><td>銀行詳細</td><td>BankDetailPage</td><td>必要</td><td>過去Q&Aアップロード・管理</td></tr>
+        <tr><td><code>/common-answers</code></td><td>共通回答DB</td><td>CommonAnswersPage</td><td>必要</td><td>全銀行共通の回答テンプレ管理</td></tr>
+        <tr><td><code>/sessions</code></td><td>セッション一覧</td><td>SessionListPage</td><td>必要</td><td>過去セッションの一覧表示</td></tr>
+        <tr><td><code>/sessions/new</code></td><td>Step1: 質問票UP</td><td>SessionNewPage</td><td>必要</td><td>銀行選択 + ファイルアップロード</td></tr>
+        <tr><td><code>/sessions/:id/step2</code></td><td>Step2: 過去回答</td><td>SessionStep2Page</td><td>必要</td><td>過去回答マッチング結果の採用/却下</td></tr>
+        <tr><td><code>/sessions/:id/step3</code></td><td>Step3: 共通回答</td><td>SessionStep3Page</td><td>必要</td><td>共通回答DBマッチング結果の採用/却下</td></tr>
+        <tr><td><code>/sessions/:id/step4</code></td><td>Step4: AI生成</td><td>SessionStep4Page</td><td>必要</td><td>残質問のAI回答生成（SSE進捗表示）</td></tr>
+        <tr><td><code>/sessions/:id/step5</code></td><td>Step5: 最終確認</td><td>SessionStep5Page</td><td>必要</td><td>全回答の編集・確定・エクスポート</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>4.1 ログイン画面</h3>
+  <div class="screen-mock">
+    <div class="screen-titlebar"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div> /login</div>
+    <div class="screen-body" style="text-align:center; padding:40px;">
+      <div style="max-width:320px; margin:0 auto; text-align:left;">
+        <p style="font-size:1.3rem; font-weight:700; margin-bottom:24px; text-align:center;">FISC-QAv2</p>
+        <p style="font-size:0.85rem; color:#6b7280; margin-bottom:8px;">メールアドレス</p>
+        <div style="border:1px solid #d1d5db; border-radius:6px; padding:8px 12px; margin-bottom:16px; color:#9ca3af;">user@example.com</div>
+        <div style="background:#2563eb; color:white; border-radius:6px; padding:10px; text-align:center; font-weight:600; font-size:0.9rem;">ログイン</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>4.2 銀行管理画面</h3>
+  <div class="screen-mock">
+    <div class="screen-titlebar"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div> /banks</div>
+    <div class="screen-body">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <span style="font-weight:600; font-size:1.1rem;">銀行管理</span>
+        <span style="background:#2563eb; color:white; padding:4px 12px; border-radius:6px; font-size:0.8rem;">+ 新規追加</span>
+      </div>
+      <table style="font-size:0.82rem;">
+        <thead><tr><th>銀行コード</th><th>銀行名</th><th>QAファイル</th><th style="text-align:right">過去Q&A</th><th></th></tr></thead>
+        <tbody>
+          <tr><td style="color:#6b7280;">mizuho</td><td style="font-weight:500;">みずほ銀行</td><td>セキュリティチェックシート</td><td style="text-align:right">42件</td><td style="color:#6b7280;">...</td></tr>
+          <tr><td style="color:#6b7280;">smbc</td><td style="font-weight:500;">三井住友銀行</td><td>FISC対応確認票</td><td style="text-align:right">18件</td><td style="color:#6b7280;">...</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:0.8rem; color:#6b7280; margin-top:12px;">銀行名クリック &rarr; 詳細画面（過去Q&Aの管理）</p>
+      <p style="font-size:0.8rem; color:#6b7280;">QAファイル定義: 列マッピング（質問列・回答列・ヘッダー行・回答形式）を銀行×ファイル単位で設定</p>
+    </div>
+  </div>
+
+  <h3>4.3 セッション - 5ステップワークフロー</h3>
+  <div class="diagram">
+    <div class="flow-steps">
+      <div class="flow-step active">1. 質問票UP</div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">2. 過去回答</div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">3. 共通回答</div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">4. AI生成</div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">5. 最終確認</div>
+    </div>
+  </div>
+
+  <h4>Step 1: 質問票アップロード</h4>
+  <div class="screen-mock">
+    <div class="screen-titlebar"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div> /sessions/new</div>
+    <div class="screen-body">
+      <p style="font-size:0.82rem; color:#6b7280;">銀行を選択 &rarr; QAファイルを選択 &rarr; 質問票ファイルをアップロード &rarr; 質問を自動抽出してStep2へ</p>
+      <ul style="font-size:0.82rem;">
+        <li>対応形式: Excel (.xlsx), Word (.docx)</li>
+        <li>QAファイル定義に基づき列マッピングで質問を自動抽出</li>
+        <li>選択肢型・判定型・自由記述型に対応</li>
+      </ul>
+    </div>
+  </div>
+
+  <h4>Step 2: 過去回答マッチング</h4>
+  <div class="screen-mock">
+    <div class="screen-titlebar"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div> /sessions/:id/step2</div>
+    <div class="screen-body">
+      <p style="font-size:0.82rem; color:#6b7280;">「マッチング実行」ボタン &rarr; 過去Q&AペアとAIで類似度マッチング</p>
+      <table style="font-size:0.8rem;">
+        <thead><tr><th>#</th><th>今回の質問</th><th>前回の質問</th><th>前回の回答</th><th>採用</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>アクセス管理方針は？</td><td>アクセス管理の方針は？</td><td style="color:#059669;">多要素認証を導入...</td><td style="text-align:center;">&#10003; / &#10005;</td></tr>
+          <tr style="opacity:0.5;"><td>2</td><td>BCP対応状況は？</td><td colspan="2" style="color:#6b7280; font-style:italic;">過去回答なし</td><td></td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:0.8rem; color:#6b7280; margin-top:8px;">採用された質問は回答確定。未マッチ質問はStep3へ。</p>
+    </div>
+  </div>
+
+  <h4>Step 3: 共通回答マッチング</h4>
+  <div class="screen-mock">
+    <div class="screen-titlebar"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div> /sessions/:id/step3</div>
+    <div class="screen-body">
+      <p style="font-size:0.82rem; color:#6b7280;">Step2で未解決の質問について、共通回答DBとAIマッチング。全解決済みの場合はスキップ可。</p>
+      <p style="font-size:0.82rem; color:#6b7280;">構成はStep2と同様（質問 / 共通回答 / 採用判定テーブル）</p>
+    </div>
+  </div>
+
+  <h4>Step 4: AI回答生成</h4>
+  <div class="screen-mock">
+    <div class="screen-titlebar"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div> /sessions/:id/step4</div>
+    <div class="screen-body">
+      <p style="font-size:0.82rem; color:#6b7280;">「生成を開始」ボタン &rarr; バックグラウンドでAIパイプライン実行</p>
+      <div style="background:#1e293b; color:#e2e8f0; border-radius:6px; padding:12px; font-family:monospace; font-size:0.75rem; margin:8px 0;">
+        [1/5] 質問票読み込み完了: 20問<br>
+        [2/5] インデックス完了: KB 12ファイル<br>
+        [3/5] ルーティング完了: Reader 3台に分配<br>
+        [4/5] 回答生成完了: 8/8問<br>
+        [5/5] レビュー完了: 承認推奨 6問 / 要確認 2問
+      </div>
+      <p style="font-size:0.8rem; color:#6b7280;">SSE（Server-Sent Events）でリアルタイム進捗表示。生成不要時はスキップ。</p>
+    </div>
+  </div>
+
+  <h4>Step 5: 最終確認・エクスポート</h4>
+  <div class="screen-mock">
+    <div class="screen-titlebar"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div> /sessions/:id/step5</div>
+    <div class="screen-body">
+      <div style="display:flex; gap:8px; margin-bottom:12px; font-size:0.78rem;">
+        <span>全20件:</span>
+        <span style="background:#dbeafe; color:#1e40af; padding:1px 6px; border-radius:9999px;">過去回答 8</span>
+        <span style="background:#ede9fe; color:#7c3aed; padding:1px 6px; border-radius:9999px;">共通回答 4</span>
+        <span style="background:#d1fae5; color:#059669; padding:1px 6px; border-radius:9999px;">AI生成 6</span>
+        <span style="background:#f3f4f6; color:#6b7280; padding:1px 6px; border-radius:9999px;">未回答 2</span>
+      </div>
+      <table style="font-size:0.8rem;">
+        <thead><tr><th>#</th><th>質問</th><th>回答</th><th>ソース</th><th>共通</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>アクセス管理方針</td><td>多要素認証を導入...</td><td><span class="badge badge-blue">過去回答</span></td><td></td><td style="color:#6b7280;">&#9998;</td></tr>
+          <tr><td>5</td><td>BCP対応状況</td><td>年1回のBCP訓練...</td><td><span class="badge badge-green">AI生成</span></td><td>&#10003;</td><td style="color:#6b7280;">&#9998;</td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex; gap:8px; margin-top:12px; justify-content:flex-end;">
+        <span style="background:#2563eb; color:white; padding:6px 14px; border-radius:6px; font-size:0.82rem; font-weight:600;">確定して蓄積</span>
+        <span style="border:1px solid #d1d5db; padding:6px 14px; border-radius:6px; font-size:0.82rem;">エクスポート</span>
+      </div>
+      <p style="font-size:0.8rem; color:#6b7280; margin-top:8px;">「確定して蓄積」&rarr; 過去回答DBに自動蓄積 + 共通回答DB追加（チェック分）</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 5. AGENT DESIGN                                               -->
+<!-- ============================================================ -->
+<section id="agent-design">
+  <h2><span class="num">5</span> エージェント設計</h2>
+  <p class="section-desc">5つの専門エージェントによるSequential + Concurrentパイプライン。Microsoft Azure Architecture Centerのパターンに準拠。</p>
+
+  <h3>パイプライン概観</h3>
+  <div class="agent-pipeline">
+    <div class="agent-box orch">
+      <div class="agent-id">Agent 0</div>
+      <div class="agent-name">Orchestrator</div>
+      <div class="agent-desc">全体制御・並列管理</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="agent-box idx">
+      <div class="agent-id">Agent 1</div>
+      <div class="agent-name">Indexer</div>
+      <div class="agent-desc">KB目録生成</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="agent-box rtr">
+      <div class="agent-id">Agent 2</div>
+      <div class="agent-name">Router</div>
+      <div class="agent-desc">質問ルーティング</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="agent-box rdr">
+      <div class="agent-id">Agent 3</div>
+      <div class="agent-name">Reader x N</div>
+      <div class="agent-desc">並列回答生成</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="agent-box rev">
+      <div class="agent-id">Agent 4</div>
+      <div class="agent-name">Reviewer</div>
+      <div class="agent-desc">品質レビュー</div>
+    </div>
+  </div>
+
+  <h3>5.1 Agent 0: Orchestrator（司令塔）</h3>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr><th style="width:140px;">ソースコード</th><td><code>src/orchestrator.py</code></td></tr>
+          <tr><th>LLM依存</th><td><span class="badge badge-gray">不要</span> &mdash; 純粋な制御ロジック</td></tr>
+          <tr><th>入力</th><td>質問票Excelパス, KBディレクトリ, Config</td></tr>
+          <tr><th>出力</th><td>出力Excelファイルパス</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h4>責務</h4>
+    <ul>
+      <li><strong>パイプライン制御</strong>: 5段階処理を順序実行（Index &rarr; Route &rarr; Read &rarr; Review &rarr; Output）</li>
+      <li><strong>過去回答の再利用判定</strong>: Router結果 + Indexer更新情報から、関連KBが未更新なら過去回答を採用（LLMスキップ）</li>
+      <li><strong>Reader並列実行</strong>: <code>ThreadPoolExecutor</code>でFan-out/Fan-in。全Readerが同時実行</li>
+      <li><strong>リトライ制御</strong>: 指数バックオフで最大3回リトライ。全失敗時は「未回答」+LOW信頼度で埋める</li>
+      <li><strong>結果集約</strong>: 全Readerの回答を <code>dict[int, Answer]</code> にマージ</li>
+    </ul>
+  </div>
+
+  <h3>5.2 Agent 1: Indexer（資料整理係）</h3>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr><th style="width:140px;">ソースコード</th><td><code>src/indexer.py</code></td></tr>
+          <tr><th>LLM依存</th><td><span class="badge badge-orange">オプション</span> &mdash; LLMなし: ローカル500文字要約のみ</td></tr>
+          <tr><th>入力</th><td>KBディレクトリ, 前回インデックス (optional)</td></tr>
+          <tr><th>出力</th><td><code>list[IndexEntry]</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h4>責務</h4>
+    <ul>
+      <li><strong>ファイル走査</strong>: KB配下を再帰走査しPDF/DOCX/XLSX/テキストを列挙</li>
+      <li><strong>要約抽出</strong>: PDF先頭2ページ、DOCX見出し優先、XLSX全行、テキスト先頭50行から500文字要約</li>
+      <li><strong>トークン数推定</strong>: ヒューリスティック（日本語2文字/token、英語4文字/token）</li>
+      <li><strong>変更検知</strong>: mtime比較で <code>updated</code> フラグ設定</li>
+      <li><strong>キャッシュ</strong>: <code>.fisc_index_cache.json</code> に保存/読み込み</li>
+    </ul>
+  </div>
+
+  <h3>5.3 Agent 2: Router（振り分け係）</h3>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr><th style="width:140px;">ソースコード</th><td><code>src/router.py</code></td></tr>
+          <tr><th>LLM依存</th><td><span class="badge badge-orange">オプション</span> &mdash; LLMなし: 静的キーワードマッチ（12カテゴリ）</td></tr>
+          <tr><th>入力</th><td><code>list[Question]</code>, <code>list[IndexEntry]</code>, token_budget</td></tr>
+          <tr><th>出力</th><td><code>RoutingResult</code> (<code>list[ReaderAssignment]</code>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h4>責務</h4>
+    <ul>
+      <li><strong>LLM動的ルーティング</strong>: インデックス+質問をLLMに渡し、各質問に1-3ファイル割当</li>
+      <li><strong>静的フォールバック</strong>: <code>_KEYWORD_MAP</code>（12カテゴリ） + <code>_CATEGORY_HINTS</code></li>
+      <li><strong>ビンパッキング</strong>: 質問+ファイルを <code>token_budget_per_reader</code>（デフォルト80,000）に収まるようReaderに分配</li>
+      <li><strong>Reader割り当て生成</strong>: reader_id=A/B/C..., questions, files, estimated_tokens</li>
+    </ul>
+  </div>
+
+  <h3>5.4 Agent 3: Reader（回答担当）</h3>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr><th style="width:140px;">ソースコード</th><td><code>src/reader.py</code></td></tr>
+          <tr><th>LLM依存</th><td><span class="badge badge-red">必須</span> &mdash; LLMなしでは動作不可</td></tr>
+          <tr><th>入力</th><td>reader_id, <code>list[Question]</code>, ファイルパス, KB base dir, API key, model</td></tr>
+          <tr><th>出力</th><td><code>list[Answer]</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h4>責務</h4>
+    <ul>
+      <li><strong>KB全文読み取り</strong>: PDF（PyMuPDF/フォールバック）、DOCX、XLSX、テキスト</li>
+      <li><strong>回答生成</strong>: KB全文+質問リストをLLMに投入（max_tokens: 16,384）</li>
+      <li><strong>応答パース</strong>: 3段階フォールバック（直接parse &rarr; コードブロック抽出 &rarr; 括弧深度マッチング）</li>
+      <li><strong>切断回復</strong>: <code>finish_reason="length"</code> 時に閉じ括弧補完で部分回答救済</li>
+      <li><strong>欠損補完</strong>: LLM応答に含まれなかった質問を「回答不可候補」+LOW信頼度で埋める</li>
+    </ul>
+    <div class="info-box">Reader はシステムの核心。複数インスタンスが並列実行される（Reader A, B, C...）。各Readerは独立して動作し、Routerが割り当てたファイルセットのみを読む。</div>
+  </div>
+
+  <h3>5.5 Agent 4: Reviewer（チェック係）</h3>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr><th style="width:140px;">ソースコード</th><td><code>src/reviewer.py</code></td></tr>
+          <tr><th>LLM依存</th><td><span class="badge badge-orange">オプション</span> &mdash; LLMなし: ルールベース2ルールのみ</td></tr>
+          <tr><th>入力</th><td><code>list[Question]</code>, <code>dict[int, Answer]</code>, API key, model</td></tr>
+          <tr><th>出力</th><td>(<code>dict[int, Answer]</code>（上書き済み）, <code>list[ReviewNote]</code>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h4>責務</h4>
+    <ul>
+      <li><strong>LLMレビュー</strong>: 全回答サマリーをLLMに渡し、矛盾検出・根拠妥当性チェック・最終信頼度判定</li>
+      <li><strong>信頼度/ステータス上書き</strong>: LLMの <code>final_judgments</code> に基づくオーバーライド</li>
+      <li><strong>ルールベースレビュー</strong>（常に適用）:
+        <ul>
+          <li>LOW信頼度 &rarr; status=「回答不可」に強制</li>
+          <li>回答テキスト空 + HIGH/MEDIUM信頼度 &rarr; LOW降格 + 「回答不可」</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <h3>5.6 エージェント比較表</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Agent</th><th>LLM必須?</th><th>LLM用途</th><th>LLMなしの動作</th><th>並列度</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Orchestrator</strong></td><td><span class="badge badge-gray">不要</span></td><td>&mdash;</td><td>完全動作</td><td>1</td></tr>
+        <tr><td><strong>Indexer</strong></td><td><span class="badge badge-orange">OP</span></td><td>ファイル要約強化</td><td>ローカル500文字要約</td><td>1</td></tr>
+        <tr><td><strong>Router</strong></td><td><span class="badge badge-orange">OP</span></td><td>動的ルーティング</td><td>静的キーワードマッチ</td><td>1</td></tr>
+        <tr><td><strong>Reader</strong></td><td><span class="badge badge-red">必須</span></td><td>回答生成</td><td>動作不可</td><td>N（並列）</td></tr>
+        <tr><td><strong>Reviewer</strong></td><td><span class="badge badge-orange">OP</span></td><td>横断レビュー</td><td>2ルールのみ</td><td>1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>5.6 追加エージェント: Matcher</h3>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr><th style="width:140px;">ソースコード</th><td><code>src/matcher.py</code></td></tr>
+          <tr><th>役割</th><td>セッションワークフロー内で、過去回答/共通回答との類似度マッチングを実行</td></tr>
+          <tr><th>使用箇所</th><td>Step2（過去回答マッチング）、Step3（共通回答マッチング: LLM使用）</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 6. USER GUIDE                                                 -->
+<!-- ============================================================ -->
+<section id="user-guide">
+  <h2><span class="num">6</span> ユーザ操作説明</h2>
+  <p class="section-desc">システム利用の標準フローを説明します。</p>
+
+  <h3>6.1 初回セットアップ</h3>
+  <ol>
+    <li><strong>ログイン</strong>: メールアドレスを入力してログイン（ホワイトリスト登録が必要）</li>
+    <li><strong>銀行登録</strong>: 「銀行管理」画面で対象銀行を登録（名前・コード）</li>
+    <li><strong>QAファイル定義</strong>: 銀行ごとに質問票のフォーマットを定義
+      <ul>
+        <li>ファイル形式（Excel / Word）</li>
+        <li>質問列・回答列の列番号</li>
+        <li>ヘッダー行・データ開始行</li>
+        <li>回答形式（自由記述型 / 選択肢+備考型 / 判定型）</li>
+      </ul>
+    </li>
+    <li><strong>過去回答アップロード</strong>（任意）: 銀行詳細画面から過去回答票をアップロード。Q&Aペアが自動抽出されDBに蓄積</li>
+    <li><strong>共通回答登録</strong>（任意）: 銀行横断で使える共通回答テンプレートを登録</li>
+  </ol>
+
+  <h3>6.2 回答作成フロー（5ステップ）</h3>
+  <div class="diagram">
+    <div class="flow-steps">
+      <div class="flow-step">1. Upload</div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">2. Past Match</div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">3. Common Match</div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">4. AI Generate</div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">5. Finalize</div>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <h4>Step 1: 質問票アップロード</h4>
+      <ol>
+        <li>「セッション」&rarr;「新規セッション」</li>
+        <li>銀行を選択</li>
+        <li>QAファイル定義を選択（あれば）</li>
+        <li>質問票ファイル（Excel/Word）をアップロード</li>
+        <li>質問が自動抽出され、Step2へ遷移</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h4>Step 2: 過去回答マッチング</h4>
+      <ol>
+        <li>「マッチング実行」をクリック</li>
+        <li>システムが過去Q&AとAI類似度照合</li>
+        <li>マッチ結果をテーブルで確認</li>
+        <li>各質問の過去回答を「採用」or「却下」</li>
+        <li>「確定してStep3へ」をクリック</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h4>Step 3: 共通回答マッチング</h4>
+      <ol>
+        <li>Step2で未解決の質問のみ表示</li>
+        <li>「マッチング実行」（LLMで共通回答DBと照合）</li>
+        <li>マッチ結果を「採用」or「却下」</li>
+        <li>全解決済みならスキップ可能</li>
+        <li>「確定してStep4へ」</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h4>Step 4: AI回答生成</h4>
+      <ol>
+        <li>まだ未解決の質問について「生成を開始」</li>
+        <li>マルチエージェントパイプラインが自動実行</li>
+        <li>SSEでリアルタイム進捗を確認</li>
+        <li>完了後「Step5: 最終確認へ」</li>
+        <li>エラー時は再試行 or スキップ可能</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h4>Step 5: 最終確認・エクスポート</h4>
+      <ol>
+        <li>全質問の回答一覧を確認</li>
+        <li>ソース別に色分け表示（過去/共通/AI/手動/未回答）</li>
+        <li>各回答を編集可能（鉛筆アイコン）</li>
+        <li>共通回答DBへの追加をチェック</li>
+        <li>「確定して蓄積」&rarr; 過去回答DBに自動蓄積</li>
+        <li>「エクスポート」&rarr; 元ファイル形式でダウンロード</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h4>自動蓄積の仕組み</h4>
+      <ul>
+        <li>Step5で「確定して蓄積」を押すと:</li>
+        <li>全回答が <code>past_qa</code> テーブルに自動蓄積</li>
+        <li>「共通回答DBに追加」チェック分は <code>common_answers</code> にも追加</li>
+        <li>次回セッションのStep2/Step3で自動的に活用される</li>
+        <li><strong>使えば使うほど精度が上がる仕組み</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>6.3 データ管理</h3>
+  <div class="card-grid">
+    <div class="card">
+      <h4>銀行管理</h4>
+      <ul>
+        <li>銀行の追加・編集・削除</li>
+        <li>QAファイル定義の管理（列マッピング）</li>
+        <li>銀行削除時は関連データも全て削除（カスケード）</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>過去回答管理</h4>
+      <ul>
+        <li>銀行詳細画面から過去回答票をアップロード</li>
+        <li>Q&Aペアの一覧表示・個別削除</li>
+        <li>セッション確定時に自動蓄積</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>共通回答DB管理</h4>
+      <ul>
+        <li>質問パターン + 回答テキストのCRUD</li>
+        <li>カテゴリ・キーワード検索</li>
+        <li>全銀行横断で共有</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 7. SECURITY                                                   -->
+<!-- ============================================================ -->
+<section id="security">
+  <h2><span class="num">7</span> セキュリティ設計</h2>
+  <p class="section-desc">認証・認可・シークレット管理の設計。</p>
+
+  <h3>7.1 認証フロー</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>項目</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>認証方式</td><td>Azure AD / MSAL（本番） / メールアドレス簡易認証（開発）</td></tr>
+        <tr><td>トークン形式</td><td>Base64エンコードされたメールアドレス（Bearer Token）</td></tr>
+        <tr><td>ホワイトリスト</td><td><code>ALLOWED_EMAILS</code> 環境変数（カンマ区切り）。空の場合は全員許可（開発用）</td></tr>
+        <tr><td>トークン検証</td><td>各APIリクエストで <code>get_current_user</code> Dependency が Bearer Token をデコード・検証</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>7.2 シークレット管理</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>環境</th><th>管理方法</th></tr></thead>
+      <tbody>
+        <tr><td>ローカル</td><td>環境変数（<code>.env</code> ファイル / <code>dev.sh</code>）</td></tr>
+        <tr><td>本番</td><td>Google Cloud Secret Manager（<code>openai-api-key</code>, <code>allowed-emails</code>）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>7.3 CORS設定</h3>
+  <pre><code>allow_origins: ["http://localhost:5173"]   # 開発
+               ["https://izanagi.an.r.appspot.com"]  # 本番
+allow_credentials: true
+allow_methods: ["*"]
+allow_headers: ["*"]</code></pre>
+</section>
+
+<!-- ============================================================ -->
+<!-- 8. INFRA                                                      -->
+<!-- ============================================================ -->
+<section id="infra">
+  <h2><span class="num">8</span> インフラ構成</h2>
+  <p class="section-desc">GCPベースのインフラストラクチャ。</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>項目</th><th>開発環境</th><th>本番環境</th></tr></thead>
+      <tbody>
+        <tr><td>プロジェクトID</td><td><code>izanagi-dev</code></td><td><code>izanagi</code></td></tr>
+        <tr><td>リージョン</td><td>-</td><td><code>asia-northeast1</code></td></tr>
+        <tr><td>URL</td><td><code>http://localhost:5173</code></td><td><code>https://izanagi.an.r.appspot.com</code></td></tr>
+        <tr><td>コンピュート</td><td>ローカル（uvicorn + vite dev）</td><td>App Engine Standard</td></tr>
+        <tr><td>DB</td><td>SQLite + Datastore Emulator (:8081)</td><td>Cloud Datastore</td></tr>
+        <tr><td>ストレージ</td><td>ローカルファイルシステム</td><td>Cloud Storage (<code>izanagi-files</code>)</td></tr>
+        <tr><td>認証</td><td>モック（<code>AUTH_MOCK_MODE=true</code>）</td><td>Azure AD / MSAL</td></tr>
+        <tr><td>シークレット</td><td>環境変数</td><td>Secret Manager</td></tr>
+        <tr><td>AI API</td><td><code>FISC_API_KEY</code> / <code>OPENAI_API_KEY</code></td><td>Secret Manager経由</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>開発環境の起動</h3>
+  <pre><code># 全サービス起動
+./scripts/dev.sh start
+
+# 状態確認
+./scripts/dev.sh status
+
+# 全サービス停止
+./scripts/dev.sh stop</code></pre>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>サービス</th><th>URL</th></tr></thead>
+      <tbody>
+        <tr><td>Frontend</td><td><code>http://localhost:5173</code></td></tr>
+        <tr><td>Backend API</td><td><code>http://localhost:8000</code></td></tr>
+        <tr><td>API Docs (Swagger)</td><td><code>http://localhost:8000/docs</code></td></tr>
+        <tr><td>Datastore Emulator</td><td><code>http://localhost:8081</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>主要設定パラメータ</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>パラメータ</th><th>デフォルト</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><code>FISC_KB_DIR</code></td><td><code>kb</code></td><td>ナレッジベースディレクトリ</td></tr>
+        <tr><td><code>FISC_TOKEN_BUDGET</code></td><td><code>80000</code></td><td>Reader当たりのトークン予算</td></tr>
+        <tr><td><code>FISC_MODEL</code></td><td><code>claude-sonnet-4-20250514</code></td><td>AIモデル（Reader/Reviewer）</td></tr>
+        <tr><td><code>FISC_OUTPUT_DIR</code></td><td><code>output</code></td><td>出力ディレクトリ</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div><!-- /.container -->
+
+<!-- ============================================================ -->
+<!-- FOOTER                                                        -->
+<!-- ============================================================ -->
+<div class="footer">
+  <p>FISC-QAv2 設計書 &mdash; ステラアイズ株式会社 &mdash; Project izanagi</p>
+  <p style="margin-top:4px;">Generated 2026-03-21</p>
+</div>
+
+<script>
+// Sticky nav active state
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.nav a');
+
+function updateActiveNav() {
+  const scrollY = window.scrollY + 100;
+  sections.forEach(section => {
+    const top = section.offsetTop;
+    const height = section.offsetHeight;
+    const id = section.getAttribute('id');
+    const link = document.querySelector(`.nav a[href="#${id}"]`);
+    if (link) {
+      if (scrollY >= top && scrollY < top + height) {
+        link.classList.add('active');
+      } else {
+        link.classList.remove('active');
+      }
+    }
+  });
+}
+window.addEventListener('scroll', updateActiveNav);
+updateActiveNav();
+</script>
+</body>
+</html>
