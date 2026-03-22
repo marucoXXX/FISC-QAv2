@@ -4,14 +4,7 @@ import { Check, X } from "lucide-react"
 import { apiFetch } from "@/lib/httpClient"
 import { diffWords } from "@/lib/textDiff"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card"
 import { StepIndicator } from "@/components/StepIndicator"
 
 type SessionQuestion = {
@@ -42,7 +35,6 @@ export default function SessionStep2Page() {
     if (res.ok) {
       const data = await res.json()
       setQuestions(data)
-      // Check if already matched
       if (data.some((q: SessionQuestion) => q.matched_past_qa_id)) {
         setMatched(true)
       }
@@ -116,112 +108,112 @@ export default function SessionStep2Page() {
             <Button onClick={handleConfirm}>確定してStep3へ</Button>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">#</TableHead>
-                <TableHead>今回の質問</TableHead>
-                <TableHead>前回の質問</TableHead>
-                <TableHead>
-                  <div>差分</div>
-                  <div className="flex items-center gap-2 mt-1 font-normal">
-                    <span className="bg-red-100 text-red-800 line-through dark:bg-red-900/40 dark:text-red-300 text-xs px-1 rounded">前回のみ</span>
-                    <span className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 text-xs px-1 rounded">今回のみ</span>
-                  </div>
-                </TableHead>
-                <TableHead>LLM判定</TableHead>
-                <TableHead>前回の回答</TableHead>
-                <TableHead className="w-24 text-center">採用</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {questions.map((q) => {
-                const hasMatch = !!q.matched_past_qa_id
-                const isAccepted = decisions[q.question_no] ?? hasMatch
-                return (
-                  <TableRow key={q.question_no} className={!hasMatch ? "opacity-50" : ""}>
-                    <TableCell className="font-mono text-xs">{q.question_no}</TableCell>
-                    <TableCell className="text-sm">
-                      <div className="whitespace-pre-wrap">{q.question_text}</div>
-                    </TableCell>
-                    <TableCell className="text-sm">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span>差分の凡例:</span>
+            <span className="bg-red-100 text-red-800 line-through dark:bg-red-900/40 dark:text-red-300 px-1 rounded">前回のみ</span>
+            <span className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 px-1 rounded">今回のみ</span>
+          </div>
+
+          <div className="space-y-3">
+            {questions.map((q) => {
+              const hasMatch = !!q.matched_past_qa_id
+              const isAccepted = decisions[q.question_no] ?? hasMatch
+              return (
+                <Card key={q.question_no} className={`py-4 gap-3 ${!hasMatch ? "opacity-50" : ""}`}>
+                  <CardHeader className="py-0">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <span className="font-mono text-muted-foreground">#{q.question_no}</span>
                       {hasMatch ? (
-                        <div className="whitespace-pre-wrap">{q.past_question_text}</div>
+                        <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700">マッチあり</span>
                       ) : (
-                        <span className="text-muted-foreground italic">過去回答なし</span>
+                        <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-500">過去回答なし</span>
                       )}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {hasMatch && (() => {
-                        const segments = diffWords(q.past_question_text, q.question_text)
-                        const hasDiff = segments.some((s) => s.type !== "same")
-                        if (!hasDiff) {
-                          return <span className="text-muted-foreground">差分なし ✅</span>
-                        }
-                        return (
-                          <div className="whitespace-pre-wrap">
-                            {segments.map((seg, i) =>
-                              seg.type === "same" ? (
-                                <span key={i}>{seg.text}</span>
-                              ) : seg.type === "added" ? (
-                                <span key={i} className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">{seg.text}</span>
-                              ) : (
-                                <span key={i} className="bg-red-100 text-red-800 line-through dark:bg-red-900/40 dark:text-red-300">{seg.text}</span>
-                              )
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </TableCell>
-                    <TableCell className="text-sm">
                       {hasMatch && q.match_judgment && (
-                        <div className="space-y-1">
-                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                            q.match_judgment === "reusable"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                              : q.match_judgment === "caution"
-                              ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
-                              : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-                          }`}>
-                            {q.match_judgment === "reusable" ? "✅ 同趣旨" :
-                             q.match_judgment === "caution" ? "⚠️ 要注意" : "❌ 別趣旨"}
-                          </span>
-                          {q.match_reason && (
-                            <p className="text-xs text-muted-foreground">{q.match_reason}</p>
-                          )}
-                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          q.match_judgment === "reusable"
+                            ? "bg-green-100 text-green-800"
+                            : q.match_judgment === "caution"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                        }`}>
+                          {q.match_judgment === "reusable" ? "同趣旨" :
+                           q.match_judgment === "caution" ? "要注意" : "別趣旨"}
+                        </span>
                       )}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {hasMatch && <div className="whitespace-pre-wrap">{q.past_answer_text}</div>}
-                    </TableCell>
-                    <TableCell className="text-center">
+                      {hasMatch && q.match_reason && (
+                        <span className="text-xs text-muted-foreground">{q.match_reason}</span>
+                      )}
+                    </CardTitle>
+                    <CardAction>
                       {hasMatch && (
-                        <div className="flex justify-center gap-1">
+                        <div className="flex items-center gap-1">
                           <Button
                             variant={isAccepted ? "default" : "outline"}
-                            size="icon"
-                            className="h-7 w-7"
+                            size="sm"
+                            className="h-7 text-xs px-2"
                             onClick={() => toggleDecision(q.question_no, true)}
                           >
-                            <Check className="h-3.5 w-3.5" />
+                            <Check className="h-3.5 w-3.5 mr-1" />
+                            採用
                           </Button>
                           <Button
                             variant={!isAccepted ? "destructive" : "outline"}
-                            size="icon"
-                            className="h-7 w-7"
+                            size="sm"
+                            className="h-7 text-xs px-2"
                             onClick={() => toggleDecision(q.question_no, false)}
                           >
-                            <X className="h-3.5 w-3.5" />
+                            <X className="h-3.5 w-3.5 mr-1" />
+                            不採用
                           </Button>
                         </div>
                       )}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+                    </CardAction>
+                  </CardHeader>
+                  <CardContent className="space-y-3 py-0">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">今回の質問</p>
+                      <p className="text-sm whitespace-pre-wrap">{q.question_text}</p>
+                    </div>
+                    {hasMatch && (
+                      <>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">前回の質問</p>
+                          <p className="text-sm whitespace-pre-wrap">{q.past_question_text}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">差分</p>
+                          {(() => {
+                            const segments = diffWords(q.past_question_text, q.question_text)
+                            const hasDiff = segments.some((s) => s.type !== "same")
+                            if (!hasDiff) {
+                              return <span className="text-sm text-muted-foreground">差分なし</span>
+                            }
+                            return (
+                              <p className="text-sm whitespace-pre-wrap">
+                                {segments.map((seg, i) =>
+                                  seg.type === "same" ? (
+                                    <span key={i}>{seg.text}</span>
+                                  ) : seg.type === "added" ? (
+                                    <span key={i} className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">{seg.text}</span>
+                                  ) : (
+                                    <span key={i} className="bg-red-100 text-red-800 line-through dark:bg-red-900/40 dark:text-red-300">{seg.text}</span>
+                                  )
+                                )}
+                              </p>
+                            )
+                          })()}
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">前回の回答</p>
+                          <p className="text-sm whitespace-pre-wrap">{q.past_answer_text}</p>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
         </>
       )}
     </div>

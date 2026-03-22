@@ -13,7 +13,6 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, FastAPI, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from ..config import Config
@@ -22,7 +21,6 @@ from . import pipeline
 
 UPLOAD_DIR = Path("data/uploads")
 
-STATIC_DIR = Path(__file__).parent / "static"
 
 
 # --- Pydantic Models ---
@@ -913,9 +911,6 @@ def create_app(
 
     router = create_router(db_path, config)
     app.include_router(router)
-
-    # --- Static files (frontend) ---
-    app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
     return app
 

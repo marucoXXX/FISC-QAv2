@@ -34,6 +34,9 @@ backend/uploads/
 
 # Output
 output/
+data/uploads/
+test-results/
+_archived/
 
 # Env backups
 .env.bk

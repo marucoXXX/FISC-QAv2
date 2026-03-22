@@ -351,11 +351,6 @@ def test_api_delete_run(populated_client):
     assert res.status_code == 404
 
 
-def test_api_static_html(client):
-    res = client.get("/")
-    assert res.status_code == 200
-    assert "FISC-QAv2" in res.text
-
 
 # --- Config API Tests ---
 
