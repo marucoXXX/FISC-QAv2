@@ -53,10 +53,10 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/banks" /> : <LoginPage />} />
       <Route path="/" element={<Navigate to="/banks" />} />
       <Route path="/welcome" element={<P title="Welcome"><WelcomePage /></P>} />
-      <Route path="/banks" element={<P title="銀行管理"><BankListPage /></P>} />
-      <Route path="/banks/:bankId" element={<P title="銀行詳細"><BankDetailPage /></P>} />
-      <Route path="/common-answers" element={<P title="共通回答DB"><CommonAnswersPage /></P>} />
-      <Route path="/kb-folders" element={<P title="KBフォルダ管理"><KbFoldersPage /></P>} />
+      <Route path="/banks" element={<P title="金融機関・アンケート管理"><BankListPage /></P>} />
+      <Route path="/banks/:bankId" element={<P title="金融機関詳細"><BankDetailPage /></P>} />
+      <Route path="/common-answers" element={<P title="共通回答DB管理"><CommonAnswersPage /></P>} />
+      <Route path="/kb-folders" element={<P title="システム別ナレッジDB管理"><KbFoldersPage /></P>} />
       <Route path="/sessions" element={<P title="ワークフロー"><SessionListPage /></P>} />
       <Route path="/sessions/new" element={<P title="新規ワークフロー"><SessionNewPage /></P>} />
       <Route path="/sessions/:sessionId/step2" element={<P title="過去回答マッチング"><SessionStep2Page /></P>} />

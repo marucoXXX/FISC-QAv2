@@ -97,7 +97,7 @@ export default function SessionNewPage() {
 
         {bankId && qaFiles.length > 0 && (
           <div className="space-y-2">
-            <Label>QAファイルを選択</Label>
+            <Label>金融機関から受領したアンケートを選択</Label>
             <select
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
               value={qaFileId}

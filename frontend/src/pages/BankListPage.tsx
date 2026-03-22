@@ -205,7 +205,7 @@ export default function BankListPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">銀行管理</h2>
+        <h2 className="text-lg font-semibold">金融機関・アンケート管理</h2>
         <Button onClick={openCreateBank} size="sm">
           <Plus className="h-4 w-4 mr-1" />
           新規追加

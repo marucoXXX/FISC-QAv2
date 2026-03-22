@@ -86,7 +86,7 @@ export default function KbFoldersPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">KBフォルダ管理</h2>
+        <h2 className="text-lg font-semibold">システム別ナレッジDB管理</h2>
         <Button onClick={openCreate} size="sm">
           <Plus className="h-4 w-4 mr-1" />
           新規追加

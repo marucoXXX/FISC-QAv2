@@ -4,20 +4,20 @@ test.describe("Navigation", () => {
   test("sidebar links navigate to correct pages", async ({ page }) => {
     await page.goto("/banks")
 
-    // Click "共通回答DB" in sidebar
-    await page.getByRole("link", { name: "共通回答DB" }).click()
+    // Click "共通回答DB管理" in sidebar
+    await page.getByRole("link", { name: "共通回答DB管理" }).click()
     await expect(page).toHaveURL(/\/common-answers/)
-    await expect(page.locator("h1")).toContainText("共通回答DB")
+    await expect(page.locator("h1")).toContainText("共通回答DB管理")
 
     // Click "ワークフロー" in sidebar
     await page.getByRole("link", { name: "ワークフロー", exact: true }).click()
     await expect(page).toHaveURL(/\/sessions/)
     await expect(page.locator("h1")).toContainText("ワークフロー")
 
-    // Click "銀行管理" in sidebar
-    await page.getByRole("link", { name: "銀行管理" }).click()
+    // Click "金融機関・アンケート管理" in sidebar
+    await page.getByRole("link", { name: "金融機関・アンケート管理" }).click()
     await expect(page).toHaveURL(/\/banks/)
-    await expect(page.locator("h1")).toContainText("銀行管理")
+    await expect(page.locator("h1")).toContainText("金融機関・アンケート管理")
   })
 
   test("session row navigates to appropriate step", async ({ page }) => {

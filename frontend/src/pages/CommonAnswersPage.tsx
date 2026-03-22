@@ -88,7 +88,7 @@ export default function CommonAnswersPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">共通回答DB</h2>
+        <h2 className="text-lg font-semibold">共通回答DB管理</h2>
         <div className="flex items-center gap-2">
           <div className="relative w-64">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

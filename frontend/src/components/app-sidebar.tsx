@@ -16,24 +16,24 @@ import { useAuth } from "@/hooks/useAuth"
 
 const menuItems = [
   {
-    title: "銀行管理",
+    title: "ワークフロー",
+    url: "/sessions",
+    icon: FileText,
+  },
+  {
+    title: "金融機関・アンケート管理",
     url: "/banks",
     icon: Building2,
   },
   {
-    title: "共通回答DB",
+    title: "共通回答DB管理",
     url: "/common-answers",
     icon: BookOpen,
   },
   {
-    title: "KBフォルダ管理",
+    title: "システム別ナレッジDB管理",
     url: "/kb-folders",
     icon: FolderOpen,
-  },
-  {
-    title: "ワークフロー",
-    url: "/sessions",
-    icon: FileText,
   },
 ]
 
