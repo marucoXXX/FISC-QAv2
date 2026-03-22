@@ -24,6 +24,7 @@ type SessionQuestion = {
   source_references: string[]
   confidence: string
   add_to_common: number
+  assessment_mark: string
 }
 
 type Stats = {
@@ -134,6 +135,15 @@ export default function SessionStep5Page() {
                   <span className={`text-xs px-2 py-0.5 rounded ${src.color}`}>
                     {src.label}
                   </span>
+                  {q.assessment_mark && (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                      q.assessment_mark === "\u25CB" ? "bg-green-100 text-green-700" :
+                      q.assessment_mark === "\u25B3" ? "bg-yellow-100 text-yellow-700" :
+                      "bg-red-100 text-red-700"
+                    }`}>
+                      {q.assessment_mark}
+                    </span>
+                  )}
                 </CardTitle>
                 <CardAction>
                   {!finalized && (

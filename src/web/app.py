@@ -591,6 +591,13 @@ def create_router(
         questions = db.get_session_questions(db_path, session_id)
         answers = {q["question_no"]: q["answer_text"] for q in questions if q["answer_text"]}
 
+        # assessment型の場合、○/△/×をchoices_colに書き込む
+        choices = None
+        fmt_type = session.get("format_type") or "freetext"
+        if fmt_type == "assessment" and session.get("choices_col"):
+            choices = {q["question_no"]: q["assessment_mark"]
+                       for q in questions if q.get("assessment_mark")}
+
         source_path = Path(session.get("source_file_path", ""))
         if source_path.exists():
             from ..file_io import FormatConfig, write_answers_to_original
@@ -602,7 +609,7 @@ def create_router(
                 header_row=session["header_row"] or 1,
                 data_start_row=session["data_start_row"] or 2,
                 table_index=session["table_index"] or 0,
-                format_type=session.get("format_type") or "freetext",
+                format_type=fmt_type,
                 choices_col=session.get("choices_col") or "",
                 remarks_col=session.get("remarks_col") or "",
             )
@@ -610,7 +617,7 @@ def create_router(
             output_dir.mkdir(parents=True, exist_ok=True)
             ext = ".docx" if (session["file_format"] or "xlsx") == "docx" else ".xlsx"
             output_path = output_dir / f"FISC回答_{session_id}{ext}"
-            write_answers_to_original(source_path, answers, fc, output_path)
+            write_answers_to_original(source_path, answers, fc, output_path, choices=choices)
 
             media = (
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"

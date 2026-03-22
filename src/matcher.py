@@ -269,3 +269,65 @@ def match_past_answers_hybrid(
             merged[q_no] = cosine_r
 
     return merged
+
+
+def judge_assessment_marks(
+    questions: list[dict],
+    api_key: str,
+    model: str,
+) -> dict[int, str]:
+    """回答テキストからセキュリティ対策の実施状況を○/△/×で一括判定する。
+
+    Args:
+        questions: [{"question_no": int, "question_text": str, "answer_text": str}]
+    Returns:
+        {question_no: "○" | "△" | "×"}
+    """
+    if not questions:
+        return {}
+
+    import litellm
+
+    qa_texts = []
+    for q in questions:
+        answer = q.get("answer_text", "") or "（未回答）"
+        qa_texts.append(f"Q{q['question_no']}: {q['question_text']}\nA: {answer}")
+
+    prompt = (
+        "あなたはセキュリティ監査の専門家です。\n"
+        "以下の質問と回答のペアについて、セキュリティ対策の実施状況を判定してください。\n\n"
+        "判定基準:\n"
+        "- ○: 具体的な対策を実施している（ツール名、規程名、実施頻度等の具体的記述がある）\n"
+        "- △: 一部実施している、または計画中・検討中である\n"
+        "- ×: 未実施、該当なし、または回答がない\n\n"
+        "【質問と回答】\n" + "\n\n".join(qa_texts) + "\n\n"
+        "結果をJSON配列で返してください。\n"
+        'フォーマット: [{"question_no": 1, "mark": "○"}, {"question_no": 2, "mark": "△"}]\n'
+        "全質問について必ず判定を返してください。"
+    )
+
+    response = litellm.completion(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        api_key=api_key,
+        temperature=0,
+    )
+
+    text = response.choices[0].message.content or ""
+    match = re.search(r"\[.*\]", text, re.DOTALL)
+    if not match:
+        return {}
+
+    try:
+        results = json.loads(match.group())
+    except json.JSONDecodeError:
+        return {}
+
+    marks: dict[int, str] = {}
+    for r in results:
+        q_no = r.get("question_no")
+        mark = r.get("mark", "")
+        if q_no is not None and mark in ("○", "△", "×"):
+            marks[q_no] = mark
+
+    return marks

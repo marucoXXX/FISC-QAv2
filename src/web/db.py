@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS session_questions (
     common_answer_text TEXT NOT NULL DEFAULT '',
     match_judgment TEXT NOT NULL DEFAULT '',
     match_reason TEXT NOT NULL DEFAULT '',
+    assessment_mark TEXT NOT NULL DEFAULT '',
     user_confirmed INTEGER NOT NULL DEFAULT 0,
     step_resolved INTEGER NOT NULL DEFAULT 0,
     add_to_common INTEGER NOT NULL DEFAULT 0,
@@ -179,6 +180,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     migrations = [
         ("session_questions", "match_judgment", "TEXT NOT NULL DEFAULT ''"),
         ("session_questions", "match_reason", "TEXT NOT NULL DEFAULT ''"),
+        ("session_questions", "assessment_mark", "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, col_def in migrations:
         try:
@@ -730,7 +732,7 @@ def update_session_question(db_path: Path, session_id: int, question_no: int, **
     allowed = {
         "answer_source", "answer_text", "source_references", "confidence",
         "matched_past_qa_id", "past_question_text", "past_answer_text",
-        "match_judgment", "match_reason",
+        "match_judgment", "match_reason", "assessment_mark",
         "matched_common_id", "common_answer_text",
         "user_confirmed", "step_resolved", "add_to_common",
     }

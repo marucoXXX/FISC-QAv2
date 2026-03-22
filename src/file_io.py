@@ -122,11 +122,15 @@ def write_answers_to_original(
     answers: dict[int, str],
     config: FormatConfig,
     output_path: Path,
+    choices: dict[int, str] | None = None,
 ) -> Path:
-    """元ファイルの回答列に書き込み、フォーマットを維持して出力"""
+    """元ファイルの回答列に書き込み、フォーマットを維持して出力
+
+    choices: assessment型の場合、choices_col に書き込む値（例: {1: "○", 2: "△"}）
+    """
     if config.file_format == "docx":
-        return _write_docx_answers(original_path, answers, config, output_path)
-    return _write_xlsx_answers(original_path, answers, config, output_path)
+        return _write_docx_answers(original_path, answers, config, output_path, choices)
+    return _write_xlsx_answers(original_path, answers, config, output_path, choices)
 
 
 def _write_xlsx_answers(
@@ -134,12 +138,14 @@ def _write_xlsx_answers(
     answers: dict[int, str],
     config: FormatConfig,
     output_path: Path,
+    choices: dict[int, str] | None = None,
 ) -> Path:
     from openpyxl import load_workbook
 
     wb = load_workbook(str(original_path))
     ws = wb.active
     a_col = config.answer_col.upper()
+    c_col = config.choices_col.upper() if config.choices_col else ""
 
     no = 0
     for row_idx in range(config.data_start_row, ws.max_row + 1):
@@ -150,6 +156,8 @@ def _write_xlsx_answers(
         no += 1
         if no in answers:
             ws[f"{a_col}{row_idx}"] = answers[no]
+        if choices and c_col and no in choices:
+            ws[f"{c_col}{row_idx}"] = choices[no]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(output_path))
@@ -162,6 +170,7 @@ def _write_docx_answers(
     answers: dict[int, str],
     config: FormatConfig,
     output_path: Path,
+    choices: dict[int, str] | None = None,
 ) -> Path:
     from docx import Document
 
@@ -172,6 +181,7 @@ def _write_docx_answers(
     table = doc.tables[config.table_index]
     a_idx = _col_letter_to_index(config.answer_col)
     q_idx = _col_letter_to_index(config.question_col)
+    c_idx = _col_letter_to_index(config.choices_col) if config.choices_col else -1
 
     no = 0
     for i, row in enumerate(table.rows):
@@ -186,6 +196,8 @@ def _write_docx_answers(
         no += 1
         if no in answers:
             cells[a_idx].text = answers[no]
+        if choices and 0 <= c_idx < len(cells) and no in choices:
+            cells[c_idx].text = choices[no]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(output_path))

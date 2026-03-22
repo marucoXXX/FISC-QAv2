@@ -218,6 +218,22 @@ def _run_session_pipeline_thread(
         finally:
             sys.stderr = old_stderr
 
+        # assessment型の場合、○/△/×を自動判定
+        if session.get("format_type") == "assessment" and config.api_key:
+            job.progress.append("○/△/×判定中...")
+            from ..matcher import judge_assessment_marks
+            all_qs = web_db.get_session_questions(db_path, session_id)
+            qa_pairs = [
+                {"question_no": q["question_no"], "question_text": q["question_text"],
+                 "answer_text": q["answer_text"]}
+                for q in all_qs
+            ]
+            marks = judge_assessment_marks(qa_pairs, config.api_key, config.model)
+            for q_no, mark in marks.items():
+                web_db.update_session_question(db_path, session_id, q_no,
+                                               assessment_mark=mark)
+            job.progress.append(f"判定完了: {len(marks)}件")
+
         web_db.update_session(db_path, session_id, current_step=5)
         job.status = "done"
         job.progress.append("生成完了")
