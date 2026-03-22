@@ -57,8 +57,8 @@ function AppRoutes() {
       <Route path="/banks/:bankId" element={<P title="銀行詳細"><BankDetailPage /></P>} />
       <Route path="/common-answers" element={<P title="共通回答DB"><CommonAnswersPage /></P>} />
       <Route path="/kb-folders" element={<P title="KBフォルダ管理"><KbFoldersPage /></P>} />
-      <Route path="/sessions" element={<P title="セッション"><SessionListPage /></P>} />
-      <Route path="/sessions/new" element={<P title="新規セッション"><SessionNewPage /></P>} />
+      <Route path="/sessions" element={<P title="ワークフロー"><SessionListPage /></P>} />
+      <Route path="/sessions/new" element={<P title="新規ワークフロー"><SessionNewPage /></P>} />
       <Route path="/sessions/:sessionId/step2" element={<P title="過去回答マッチング"><SessionStep2Page /></P>} />
       <Route path="/sessions/:sessionId/step3" element={<P title="共通回答マッチング"><SessionStep3Page /></P>} />
       <Route path="/sessions/:sessionId/step4" element={<P title="AI回答生成"><SessionStep4Page /></P>} />

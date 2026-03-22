@@ -31,7 +31,7 @@ const menuItems = [
     icon: FolderOpen,
   },
   {
-    title: "セッション",
+    title: "ワークフロー",
     url: "/sessions",
     icon: FileText,
   },

@@ -130,14 +130,13 @@ export default function SessionStep5Page() {
         </Button>
       </div>
 
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow>
             <TableHead className="w-12">#</TableHead>
-            <TableHead>質問</TableHead>
-            <TableHead>回答</TableHead>
+            <TableHead style={{ width: "40%" }}>質問</TableHead>
+            <TableHead style={{ width: "40%" }}>回答</TableHead>
             <TableHead className="w-24">ソース</TableHead>
-            <TableHead className="w-16">共通</TableHead>
             <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
@@ -146,11 +145,11 @@ export default function SessionStep5Page() {
             const src = sourceLabels[q.answer_source] || sourceLabels.pending
             return (
               <TableRow key={q.question_no}>
-                <TableCell className="font-mono text-xs">{q.question_no}</TableCell>
-                <TableCell className="text-sm">
+                <TableCell className="font-mono text-xs align-top">{q.question_no}</TableCell>
+                <TableCell className="text-sm align-top">
                   <div className="whitespace-pre-wrap">{q.question_text}</div>
                 </TableCell>
-                <TableCell className="text-sm">
+                <TableCell className="text-sm align-top">
                   <div className="whitespace-pre-wrap">{q.answer_text || <span className="text-muted-foreground italic">未回答</span>}</div>
                   {q.source_references.length > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -158,15 +157,12 @@ export default function SessionStep5Page() {
                     </p>
                   )}
                 </TableCell>
-                <TableCell>
-                  <span className={`text-xs px-2 py-0.5 rounded ${src.color}`}>
+                <TableCell className="align-top">
+                  <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${src.color}`}>
                     {src.label}
                   </span>
                 </TableCell>
-                <TableCell className="text-center">
-                  {q.add_to_common === 1 && <Check className="h-4 w-4 text-green-600 mx-auto" />}
-                </TableCell>
-                <TableCell>
+                <TableCell className="align-top">
                   {!finalized && (
                     <Button variant="ghost" size="icon" onClick={() => openEdit(q)}>
                       <Pencil className="h-4 w-4" />

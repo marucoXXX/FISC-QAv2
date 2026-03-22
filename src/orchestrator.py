@@ -162,6 +162,7 @@ def run_pipeline(
     questionnaire_path: str | Path,
     kb_dir: str | Path | list[Path],
     config: Config | None = None,
+    questions_override: list[Question] | None = None,
 ) -> Path:
     config = config or Config()
     questionnaire_path = Path(questionnaire_path)
@@ -171,8 +172,12 @@ def run_pipeline(
         kb_dirs = [Path(d) for d in kb_dir]
 
     # [1/5] 質問票読み込み
-    questions = read_questionnaire(questionnaire_path)
-    _log(f"[1/5] 質問票読み込み完了: {len(questions)}問")
+    if questions_override is not None:
+        questions = questions_override
+        _log(f"[1/5] 質問票読み込み完了（セッションから取得）: {len(questions)}問")
+    else:
+        questions = read_questionnaire(questionnaire_path)
+        _log(f"[1/5] 質問票読み込み完了: {len(questions)}問")
 
     # [2/5] インデックス生成 + 更新検知
     previous_index = load_index(Path(config.index_cache_path))

@@ -1250,7 +1250,7 @@ def test_db_bank_cascade_delete(tmp_db):
 
 
 def test_db_session_cascade_delete_questions(tmp_db):
-    bank_id = db.create_bank(tmp_db, "セッション削除", "SD01")
+    bank_id = db.create_bank(tmp_db, "ワークフロー削除", "SD01")
     session_id = db.create_session(tmp_db, bank_id, "test")
     db.bulk_add_session_questions(tmp_db, session_id, [
         {"question_no": 1, "major": "A", "minor": "B", "question_text": "Q?"},

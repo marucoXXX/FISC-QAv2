@@ -9,10 +9,10 @@ test.describe("Navigation", () => {
     await expect(page).toHaveURL(/\/common-answers/)
     await expect(page.locator("h1")).toContainText("共通回答DB")
 
-    // Click "セッション" in sidebar
-    await page.getByRole("link", { name: "セッション", exact: true }).click()
+    // Click "ワークフロー" in sidebar
+    await page.getByRole("link", { name: "ワークフロー", exact: true }).click()
     await expect(page).toHaveURL(/\/sessions/)
-    await expect(page.locator("h1")).toContainText("セッション")
+    await expect(page.locator("h1")).toContainText("ワークフロー")
 
     // Click "銀行管理" in sidebar
     await page.getByRole("link", { name: "銀行管理" }).click()

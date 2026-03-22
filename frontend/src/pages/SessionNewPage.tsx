@@ -69,7 +69,7 @@ export default function SessionNewPage() {
     if (res.ok) {
       navigate(`/sessions/${data.session_id}/step2`)
     } else {
-      setError(data.detail || "セッション作成に失敗しました")
+      setError(data.detail || "ワークフロー作成に失敗しました")
     }
     setLoading(false)
   }

@@ -561,7 +561,7 @@
 <!-- ============================================================ -->
 <section id="data-model">
   <h2><span class="num">2</span> データモデル</h2>
-  <p class="section-desc">SQLiteベースのリレーショナルデータベース。銀行管理、セッション管理、回答蓄積の3つのドメインで構成されます。</p>
+  <p class="section-desc">SQLiteベースのリレーショナルデータベース。銀行管理、ワークフロー管理、回答蓄積の3つのドメインで構成されます。</p>
 
   <h3>ER概念図</h3>
   <pre><code>  banks 1---* bank_qa_files     banks 1---* past_qa
@@ -628,8 +628,8 @@
     </div>
   </div>
 
-  <h3>2.3 sessions（セッション）</h3>
-  <div class="info-box">セッションは5ステップワークフローの実行単位です。1つの銀行 + 1つの質問票ファイルに対応します。</div>
+  <h3>2.3 sessions（ワークフロー）</h3>
+  <div class="info-box">ワークフローは5ステップワークフローの実行単位です。1つの銀行 + 1つの質問票ファイルに対応します。</div>
   <div class="er-entity">
     <div class="er-entity-header">sessions</div>
     <div class="er-entity-body">
@@ -637,10 +637,10 @@
         <table>
           <thead><tr><th>カラム</th><th>型</th><th>制約</th><th>説明</th></tr></thead>
           <tbody>
-            <tr><td><code>id</code></td><td>INTEGER</td><td>PK, AUTO</td><td>セッションID</td></tr>
+            <tr><td><code>id</code></td><td>INTEGER</td><td>PK, AUTO</td><td>ワークフローID</td></tr>
             <tr><td><code>bank_id</code></td><td>INTEGER</td><td>FK(banks.id)</td><td>対象銀行</td></tr>
             <tr><td><code>qa_file_id</code></td><td>INTEGER</td><td>FK(bank_qa_files.id), NULL可</td><td>QAファイル定義</td></tr>
-            <tr><td><code>name</code></td><td>TEXT</td><td>NOT NULL</td><td>セッション名</td></tr>
+            <tr><td><code>name</code></td><td>TEXT</td><td>NOT NULL</td><td>ワークフロー名</td></tr>
             <tr><td><code>current_step</code></td><td>INTEGER</td><td>DEFAULT 1</td><td>現在のステップ (1-5)</td></tr>
             <tr><td><code>status</code></td><td>TEXT</td><td>DEFAULT 'in_progress'</td><td>状態 (in_progress / completed)</td></tr>
             <tr><td><code>source_file_name</code></td><td>TEXT</td><td></td><td>元ファイル名</td></tr>
@@ -652,7 +652,7 @@
     </div>
   </div>
 
-  <h3>2.4 session_questions（セッション質問）</h3>
+  <h3>2.4 session_questions（ワークフロー質問）</h3>
   <div class="er-entity">
     <div class="er-entity-header">session_questions</div>
     <div class="er-entity-body">
@@ -661,7 +661,7 @@
           <thead><tr><th>カラム</th><th>型</th><th>制約</th><th>説明</th></tr></thead>
           <tbody>
             <tr><td><code>id</code></td><td>INTEGER</td><td>PK, AUTO</td><td>レコードID</td></tr>
-            <tr><td><code>session_id</code></td><td>INTEGER</td><td>FK(sessions.id)</td><td>セッション</td></tr>
+            <tr><td><code>session_id</code></td><td>INTEGER</td><td>FK(sessions.id)</td><td>ワークフロー</td></tr>
             <tr><td><code>question_no</code></td><td>INTEGER</td><td>UNIQUE(session_id, question_no)</td><td>質問番号</td></tr>
             <tr><td><code>major / minor</code></td><td>TEXT</td><td></td><td>大分類 / 小分類</td></tr>
             <tr><td><code>question_text</code></td><td>TEXT</td><td></td><td>質問文</td></tr>
@@ -868,14 +868,14 @@ class ReviewNote:
     </table>
   </div>
 
-  <h3>3.6 セッション API（5ステップワークフロー）</h3>
+  <h3>3.6 ワークフロー API（5ステップワークフロー）</h3>
   <div class="table-wrap">
     <table>
       <thead><tr><th>メソッド</th><th>パス</th><th>説明</th><th>Step</th></tr></thead>
       <tbody>
-        <tr><td><span class="method method-get">GET</span></td><td><code>/api/sessions</code></td><td>セッション一覧</td><td>-</td></tr>
-        <tr><td><span class="method method-post">POST</span></td><td><code>/api/sessions?bank_id=&amp;qa_file_id=</code></td><td>セッション作成 + 質問抽出（multipart/form-data）</td><td>1</td></tr>
-        <tr><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}</code></td><td>セッション詳細（銀行情報、QAファイル設定含む）</td><td>-</td></tr>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/sessions</code></td><td>ワークフロー一覧</td><td>-</td></tr>
+        <tr><td><span class="method method-post">POST</span></td><td><code>/api/sessions?bank_id=&amp;qa_file_id=</code></td><td>ワークフロー作成 + 質問抽出（multipart/form-data）</td><td>1</td></tr>
+        <tr><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}</code></td><td>ワークフロー詳細（銀行情報、QAファイル設定含む）</td><td>-</td></tr>
         <tr><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}/questions</code></td><td>全質問一覧</td><td>-</td></tr>
         <tr style="background:#f0f0ff;"><td><span class="method method-post">POST</span></td><td><code>/api/sessions/{id}/step2/match</code></td><td>過去回答マッチング実行</td><td>2</td></tr>
         <tr style="background:#f0f0ff;"><td><span class="method method-get">GET</span></td><td><code>/api/sessions/{id}/step2/results</code></td><td>Step2マッチング結果取得</td><td>2</td></tr>
@@ -921,7 +921,7 @@ class ReviewNote:
         <tr><td><code>/banks</code></td><td>銀行管理</td><td>BankListPage</td><td>必要</td><td>銀行+QAファイルの一覧・CRUD</td></tr>
         <tr><td><code>/banks/:bankId</code></td><td>銀行詳細</td><td>BankDetailPage</td><td>必要</td><td>過去Q&Aアップロード・管理</td></tr>
         <tr><td><code>/common-answers</code></td><td>共通回答DB</td><td>CommonAnswersPage</td><td>必要</td><td>全銀行共通の回答テンプレ管理</td></tr>
-        <tr><td><code>/sessions</code></td><td>セッション一覧</td><td>SessionListPage</td><td>必要</td><td>過去セッションの一覧表示</td></tr>
+        <tr><td><code>/sessions</code></td><td>ワークフロー一覧</td><td>SessionListPage</td><td>必要</td><td>過去ワークフローの一覧表示</td></tr>
         <tr><td><code>/sessions/new</code></td><td>Step1: 質問票UP</td><td>SessionNewPage</td><td>必要</td><td>銀行選択 + ファイルアップロード</td></tr>
         <tr><td><code>/sessions/:id/step2</code></td><td>Step2: 過去回答</td><td>SessionStep2Page</td><td>必要</td><td>過去回答マッチング結果の採用/却下</td></tr>
         <tr><td><code>/sessions/:id/step3</code></td><td>Step3: 共通回答</td><td>SessionStep3Page</td><td>必要</td><td>共通回答DBマッチング結果の採用/却下</td></tr>
@@ -964,7 +964,7 @@ class ReviewNote:
     </div>
   </div>
 
-  <h3>4.3 セッション - 5ステップワークフロー</h3>
+  <h3>4.3 ワークフロー - 5ステップワークフロー</h3>
   <div class="diagram">
     <div class="flow-steps">
       <div class="flow-step active">1. 質問票UP</div>
@@ -1233,7 +1233,7 @@ class ReviewNote:
       <table>
         <tbody>
           <tr><th style="width:140px;">ソースコード</th><td><code>src/matcher.py</code></td></tr>
-          <tr><th>役割</th><td>セッションワークフロー内で、過去回答/共通回答との類似度マッチングを実行</td></tr>
+          <tr><th>役割</th><td>ワークフローワークフロー内で、過去回答/共通回答との類似度マッチングを実行</td></tr>
           <tr><th>使用箇所</th><td>Step2（過去回答マッチング）、Step3（共通回答マッチング: LLM使用）</td></tr>
         </tbody>
       </table>
@@ -1283,7 +1283,7 @@ class ReviewNote:
     <div class="card">
       <h4>Step 1: 質問票アップロード</h4>
       <ol>
-        <li>「セッション」&rarr;「新規セッション」</li>
+        <li>「ワークフロー」&rarr;「新規ワークフロー」</li>
         <li>銀行を選択</li>
         <li>QAファイル定義を選択（あれば）</li>
         <li>質問票ファイル（Excel/Word）をアップロード</li>
@@ -1337,7 +1337,7 @@ class ReviewNote:
         <li>Step5で「確定して蓄積」を押すと:</li>
         <li>全回答が <code>past_qa</code> テーブルに自動蓄積</li>
         <li>「共通回答DBに追加」チェック分は <code>common_answers</code> にも追加</li>
-        <li>次回セッションのStep2/Step3で自動的に活用される</li>
+        <li>次回ワークフローのStep2/Step3で自動的に活用される</li>
         <li><strong>使えば使うほど精度が上がる仕組み</strong></li>
       </ul>
     </div>
@@ -1358,7 +1358,7 @@ class ReviewNote:
       <ul>
         <li>銀行詳細画面から過去回答票をアップロード</li>
         <li>Q&Aペアの一覧表示・個別削除</li>
-        <li>セッション確定時に自動蓄積</li>
+        <li>ワークフロー確定時に自動蓄積</li>
       </ul>
     </div>
     <div class="card">

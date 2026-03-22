@@ -15,6 +15,8 @@ from src.matcher import (
     _tokenize,
     match_common_answers,
     match_past_answers,
+    match_past_answers_llm,
+    match_past_answers_hybrid,
 )
 
 
@@ -142,3 +144,101 @@ class TestMatchCommonAnswers:
         # The current implementation doesn't filter by score on the client side
         assert 1 in results
         assert results[1].score == 0.3
+
+
+# --- Past answer LLM matching ---
+
+
+class TestMatchPastAnswersLlm:
+    def _mock_llm_response(self, content: str):
+        mock_resp = MagicMock()
+        mock_resp.choices = [MagicMock()]
+        mock_resp.choices[0].message.content = content
+        return mock_resp
+
+    @patch("litellm.completion")
+    def test_llm_match_reusable(self, mock_completion):
+        mock_completion.return_value = self._mock_llm_response(
+            '[{"question_no": 1, "past_qa_id": 10, "score": 0.95, '
+            '"judgment": "reusable", "reason": "語尾の変更のみ"}]'
+        )
+        questions = [{"question_no": 1, "question_text": "MFAの導入状況を教えてください"}]
+        past_qa = [{"id": 10, "question_text": "MFAの導入状況は？", "answer_text": "導入済み"}]
+
+        results = match_past_answers_llm(questions, past_qa, api_key="key", model="test")
+        assert 1 in results
+        assert results[1].matched_id == 10
+        assert results[1].judgment == "reusable"
+        assert results[1].reason == "語尾の変更のみ"
+
+    @patch("litellm.completion")
+    def test_llm_match_caution(self, mock_completion):
+        mock_completion.return_value = self._mock_llm_response(
+            '[{"question_no": 1, "past_qa_id": 10, "score": 0.7, '
+            '"judgment": "caution", "reason": "対象範囲が拡大されている"}]'
+        )
+        questions = [{"question_no": 1, "question_text": "全システムのMFA導入状況"}]
+        past_qa = [{"id": 10, "question_text": "本番系のMFA導入状況", "answer_text": "導入済み"}]
+
+        results = match_past_answers_llm(questions, past_qa, api_key="key", model="test")
+        assert results[1].judgment == "caution"
+
+    @patch("litellm.completion")
+    def test_llm_match_empty_input(self, mock_completion):
+        results = match_past_answers_llm([], [{"id": 1, "question_text": "Q", "answer_text": "A"}],
+                                         api_key="key", model="test")
+        assert results == {}
+        mock_completion.assert_not_called()
+
+    @patch("litellm.completion")
+    def test_llm_match_invalid_json(self, mock_completion):
+        mock_completion.return_value = self._mock_llm_response("no matches found")
+        questions = [{"question_no": 1, "question_text": "Q?"}]
+        past_qa = [{"id": 1, "question_text": "X", "answer_text": "A"}]
+
+        results = match_past_answers_llm(questions, past_qa, api_key="key", model="test")
+        assert results == {}
+
+
+# --- Hybrid matching ---
+
+
+class TestMatchPastAnswersHybrid:
+    def _mock_llm_response(self, content: str):
+        mock_resp = MagicMock()
+        mock_resp.choices = [MagicMock()]
+        mock_resp.choices[0].message.content = content
+        return mock_resp
+
+    @patch("litellm.completion")
+    def test_hybrid_combines_cosine_and_llm(self, mock_completion):
+        mock_completion.return_value = self._mock_llm_response(
+            '[{"question_no": 1, "past_qa_id": 10, "score": 0.95, '
+            '"judgment": "reusable", "reason": "同趣旨"}]'
+        )
+        questions = [{"question_no": 1, "question_text": "MFAの導入状況は？"}]
+        past_qa = [{"id": 10, "question_text": "MFAの導入状況は？", "answer_text": "導入済み"}]
+
+        results = match_past_answers_hybrid(questions, past_qa, api_key="key", model="test",
+                                            cosine_threshold=0.5)
+        assert 1 in results
+        assert results[1].judgment == "reusable"
+
+    @patch("litellm.completion")
+    def test_hybrid_fallback_to_cosine_only(self, mock_completion):
+        """LLMがマッチを返さない場合、cosine結果がcaution判定で残る"""
+        mock_completion.return_value = self._mock_llm_response("[]")
+        questions = [{"question_no": 1, "question_text": "MFAの導入状況は？"}]
+        past_qa = [{"id": 10, "question_text": "MFAの導入状況は？", "answer_text": "導入済み"}]
+
+        results = match_past_answers_hybrid(questions, past_qa, api_key="key", model="test",
+                                            cosine_threshold=0.5)
+        assert 1 in results
+        assert results[1].judgment == "caution"
+
+    def test_hybrid_empty_past_qa(self):
+        results = match_past_answers_hybrid(
+            [{"question_no": 1, "question_text": "Q?"}], [],
+            api_key="key", model="test",
+        )
+        assert results == {}

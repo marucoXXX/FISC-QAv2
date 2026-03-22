@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS common_answers (
     updated_at TEXT NOT NULL
 );
 
--- セッション（5ステップワークフローの単位）
+-- ワークフロー（5ステップワークフローの単位）
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bank_id INTEGER NOT NULL REFERENCES banks(id),
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     updated_at TEXT NOT NULL
 );
 
--- セッション内の各質問
+-- ワークフロー内の各質問
 CREATE TABLE IF NOT EXISTS session_questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -143,6 +143,8 @@ CREATE TABLE IF NOT EXISTS session_questions (
     past_answer_text TEXT NOT NULL DEFAULT '',
     matched_common_id INTEGER REFERENCES common_answers(id),
     common_answer_text TEXT NOT NULL DEFAULT '',
+    match_judgment TEXT NOT NULL DEFAULT '',
+    match_reason TEXT NOT NULL DEFAULT '',
     user_confirmed INTEGER NOT NULL DEFAULT 0,
     step_resolved INTEGER NOT NULL DEFAULT 0,
     add_to_common INTEGER NOT NULL DEFAULT 0,
@@ -172,9 +174,23 @@ CREATE TABLE IF NOT EXISTS kb_folders (
 """
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    """既存DBに新しい列を追加するマイグレーション"""
+    migrations = [
+        ("session_questions", "match_judgment", "TEXT NOT NULL DEFAULT ''"),
+        ("session_questions", "match_reason", "TEXT NOT NULL DEFAULT ''"),
+    ]
+    for table, col, col_def in migrations:
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+        except sqlite3.OperationalError:
+            pass  # 列が既に存在する場合はスキップ
+
+
 def init_db(db_path: Path = DEFAULT_DB_PATH) -> Path:
     with sqlite3.connect(str(db_path)) as conn:
         conn.executescript(SCHEMA)
+        _migrate(conn)
     return db_path
 
 
@@ -714,6 +730,7 @@ def update_session_question(db_path: Path, session_id: int, question_no: int, **
     allowed = {
         "answer_source", "answer_text", "source_references", "confidence",
         "matched_past_qa_id", "past_question_text", "past_answer_text",
+        "match_judgment", "match_reason",
         "matched_common_id", "common_answer_text",
         "user_confirmed", "step_resolved", "add_to_common",
     }

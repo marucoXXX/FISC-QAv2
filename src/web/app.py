@@ -359,7 +359,7 @@ def create_router(
 
     # Step2: Past answer matching
     @router.post("/api/sessions/{session_id}/step2/match")
-    def step2_match(session_id: int) -> dict:
+    def step2_match(session_id: int, match_strategy: str = Query("cosine")) -> dict:
         session = db.get_session(db_path, session_id)
         if not session:
             raise HTTPException(404)
@@ -367,17 +367,25 @@ def create_router(
         questions = db.get_session_questions(db_path, session_id)
         past_qas = db.list_past_qa(db_path, session["bank_id"])
 
-        from ..matcher import match_past_answers
-        matches = match_past_answers(
-            [{"question_no": q["question_no"], "question_text": q["question_text"]} for q in questions],
-            past_qas,
-        )
+        q_dicts = [{"question_no": q["question_no"], "question_text": q["question_text"]} for q in questions]
+
+        if match_strategy == "llm":
+            from ..matcher import match_past_answers_llm
+            matches = match_past_answers_llm(q_dicts, past_qas, api_key=config.api_key, model=config.model)
+        elif match_strategy == "hybrid":
+            from ..matcher import match_past_answers_hybrid
+            matches = match_past_answers_hybrid(q_dicts, past_qas, api_key=config.api_key, model=config.model)
+        else:
+            from ..matcher import match_past_answers
+            matches = match_past_answers(q_dicts, past_qas)
 
         for q_no, m in matches.items():
             db.update_session_question(db_path, session_id, q_no,
                 matched_past_qa_id=m.matched_id,
                 past_question_text=m.matched_question,
                 past_answer_text=m.matched_answer,
+                match_judgment=m.judgment,
+                match_reason=m.reason,
             )
 
         return {"matched": len(matches), "total": len(questions)}

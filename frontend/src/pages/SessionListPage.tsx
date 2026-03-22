@@ -47,11 +47,11 @@ export default function SessionListPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">セッション</h2>
+        <h2 className="text-lg font-semibold">ワークフロー</h2>
         <Link to="/sessions/new">
           <Button size="sm">
             <Plus className="h-4 w-4 mr-1" />
-            新規セッション
+            新規ワークフロー
           </Button>
         </Link>
       </div>
@@ -71,7 +71,7 @@ export default function SessionListPage() {
           {sessions.length === 0 && (
             <TableRow>
               <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                セッションがありません
+                ワークフローがありません
               </TableCell>
             </TableRow>
           )}

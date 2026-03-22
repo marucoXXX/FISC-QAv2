@@ -152,23 +152,33 @@ def _run_session_pipeline_thread(
 
     try:
         job.status = "running"
-        job.progress.append(f"セッション #{session_id}: {len(unresolved_questions)}件の質問を生成中...")
+        job.progress.append(f"ワークフロー #{session_id}: {len(unresolved_questions)}件の質問を生成中...")
 
         from ..orchestrator import run_pipeline
-        from ..excel_io import read_questionnaire
-        from ..web import db as web_db
+        from ..models import Question
+        from . import db as web_db
 
         session = web_db.get_session(db_path, session_id)
         if not session:
             raise ValueError("Session not found")
+
+        # セッションの全質問をQuestionオブジェクトに変換（DOCX/XLSX問わず使える）
+        all_session_questions = web_db.get_session_questions(db_path, session_id)
+        questions_override = [
+            Question(
+                no=q["question_no"],
+                question=q["question_text"],
+                major=q.get("major", ""),
+                minor=q.get("minor", ""),
+            )
+            for q in all_session_questions
+        ]
 
         capture = _ProgressCapture(job)
         old_stderr = sys.stderr
         sys.stderr = capture  # type: ignore[assignment]
 
         try:
-            # Use existing pipeline for generation
-            from . import db as web_db
             kb_folders = web_db.list_kb_folders(db_path)
             if kb_folders:
                 kb_dirs = [Path(f["path"]) for f in kb_folders]
@@ -177,10 +187,14 @@ def _run_session_pipeline_thread(
             source_path = Path(session.get("source_file_path", ""))
 
             existing_dirs = [d for d in kb_dirs if d.exists()]
-            if source_path.exists() and existing_dirs:
-                output_path = run_pipeline(source_path, existing_dirs, config)
+            if existing_dirs:
+                # questions_overrideを渡すことでファイル読み込みをスキップ
+                output_path = run_pipeline(
+                    source_path, existing_dirs, config,
+                    questions_override=questions_override,
+                )
 
-                # Parse results and update session questions
+                # orchestratorの出力は常に.xlsx
                 from ..web.app import _parse_excel
                 content = output_path.read_bytes()
                 _, answers, _ = _parse_excel(content)
@@ -200,7 +214,7 @@ def _run_session_pipeline_thread(
                             step_resolved=4,
                         )
             else:
-                job.progress.append("ソースファイルまたはKBが見つかりません")
+                job.progress.append("KBフォルダが見つかりません")
         finally:
             sys.stderr = old_stderr
 
