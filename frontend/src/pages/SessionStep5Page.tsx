@@ -3,14 +3,7 @@ import { useParams } from "react-router-dom"
 import { Download, Pencil, Check, RotateCcw } from "lucide-react"
 import { apiFetch, getApiBaseUrl } from "@/lib/httpClient"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -130,50 +123,47 @@ export default function SessionStep5Page() {
         </Button>
       </div>
 
-      <Table className="table-fixed">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12">#</TableHead>
-            <TableHead style={{ width: "40%" }}>質問</TableHead>
-            <TableHead style={{ width: "40%" }}>回答</TableHead>
-            <TableHead className="w-24">ソース</TableHead>
-            <TableHead className="w-12"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {questions.map((q) => {
-            const src = sourceLabels[q.answer_source] || sourceLabels.pending
-            return (
-              <TableRow key={q.question_no}>
-                <TableCell className="font-mono text-xs align-top">{q.question_no}</TableCell>
-                <TableCell className="text-sm align-top">
-                  <div className="whitespace-pre-wrap">{q.question_text}</div>
-                </TableCell>
-                <TableCell className="text-sm align-top">
-                  <div className="whitespace-pre-wrap">{q.answer_text || <span className="text-muted-foreground italic">未回答</span>}</div>
+      <div className="space-y-3">
+        {questions.map((q) => {
+          const src = sourceLabels[q.answer_source] || sourceLabels.pending
+          return (
+            <Card key={q.question_no} className="py-4 gap-3">
+              <CardHeader className="py-0">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <span className="font-mono text-muted-foreground">#{q.question_no}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded ${src.color}`}>
+                    {src.label}
+                  </span>
+                </CardTitle>
+                <CardAction>
+                  {!finalized && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(q)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </CardAction>
+              </CardHeader>
+              <CardContent className="space-y-3 py-0">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">質問</p>
+                  <p className="text-sm whitespace-pre-wrap">{q.question_text}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">回答</p>
+                  <p className="text-sm whitespace-pre-wrap">
+                    {q.answer_text || <span className="text-muted-foreground italic">未回答</span>}
+                  </p>
                   {q.source_references.length > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
                       参照: {q.source_references.join(", ")}
                     </p>
                   )}
-                </TableCell>
-                <TableCell className="align-top">
-                  <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${src.color}`}>
-                    {src.label}
-                  </span>
-                </TableCell>
-                <TableCell className="align-top">
-                  {!finalized && (
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(q)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
 
       <Dialog open={!!editQ} onOpenChange={(open) => !open && setEditQ(null)}>
         <DialogContent className="max-w-lg">
