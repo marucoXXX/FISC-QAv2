@@ -141,6 +141,7 @@ def _write_xlsx_answers(
     choices: dict[int, str] | None = None,
 ) -> Path:
     from openpyxl import load_workbook
+    from openpyxl.cell.cell import MergedCell
 
     wb = load_workbook(str(original_path))
     ws = wb.active
@@ -150,14 +151,18 @@ def _write_xlsx_answers(
     no = 0
     for row_idx in range(config.data_start_row, ws.max_row + 1):
         q_idx = _col_letter_to_index(config.question_col)
-        q_cell = ws.cell(row=row_idx, column=q_idx + 1).value
-        if not q_cell or not str(q_cell).strip():
+        q_cell = ws.cell(row=row_idx, column=q_idx + 1)
+        if isinstance(q_cell, MergedCell) or not q_cell.value or not str(q_cell.value).strip():
             continue
         no += 1
         if no in answers:
-            ws[f"{a_col}{row_idx}"] = answers[no]
+            cell = ws[f"{a_col}{row_idx}"]
+            if not isinstance(cell, MergedCell):
+                cell.value = answers[no]
         if choices and c_col and no in choices:
-            ws[f"{c_col}{row_idx}"] = choices[no]
+            cell = ws[f"{c_col}{row_idx}"]
+            if not isinstance(cell, MergedCell):
+                cell.value = choices[no]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(output_path))
