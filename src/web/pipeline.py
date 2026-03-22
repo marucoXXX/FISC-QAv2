@@ -234,7 +234,7 @@ def _run_session_pipeline_thread(
                                                assessment_mark=mark)
             job.progress.append(f"判定完了: {len(marks)}件")
 
-        web_db.update_session(db_path, session_id, current_step=5)
+        web_db.update_session(db_path, session_id, current_step=5, status="completed")
         job.status = "done"
         job.progress.append("生成完了")
 

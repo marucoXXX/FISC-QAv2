@@ -1,17 +1,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "react-router-dom"
-import { Download, Pencil, Check, RotateCcw } from "lucide-react"
+import { Download, Check } from "lucide-react"
 import { apiFetch, getApiBaseUrl } from "@/lib/httpClient"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StepIndicator } from "@/components/StepIndicator"
 
 type SessionQuestion = {
@@ -44,14 +36,37 @@ const sourceLabels: Record<string, { label: string; color: string }> = {
   pending: { label: "未回答", color: "bg-gray-100 text-gray-500" },
 }
 
+function proposalMessage(q: SessionQuestion): string {
+  if (!q.answer_text) {
+    return "過去回答・共通回答・設計/運用ドキュメントからは回答が見つかりませんでした。手動での回答入力をお願いします。"
+  }
+  const refs = q.source_references.length > 0
+    ? q.source_references.join(", ")
+    : ""
+  switch (q.answer_source) {
+    case "past_match":
+      return "過去回答を参照してAIからの意見です。"
+    case "common_match":
+      return "共通回答DBを参照してAIからの意見です。"
+    case "generated":
+      return refs
+        ? `設計/運用ドキュメント（${refs}）を参照してAIからの意見です。`
+        : "設計/運用ドキュメントを参照してAIからの意見です。"
+    case "manual":
+      return "手動で入力された回答です。"
+    default:
+      return ""
+  }
+}
+
 export default function SessionStep5Page() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const [questions, setQuestions] = useState<SessionQuestion[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
-  const [editQ, setEditQ] = useState<SessionQuestion | null>(null)
-  const [editText, setEditText] = useState("")
-  const [addToCommon, setAddToCommon] = useState(false)
-  const [finalized, setFinalized] = useState(false)
+  const [accumulated, setAccumulated] = useState(false)
+  const [drafts, setDrafts] = useState<Record<number, string>>({})
+  const [savedDrafts, setSavedDrafts] = useState<Record<number, string>>({})
+  const [saving, setSaving] = useState<Record<number, boolean>>({})
 
   const load = useCallback(async () => {
     const res = await apiFetch(`/api/sessions/${sessionId}/step5/summary`)
@@ -59,33 +74,39 @@ export default function SessionStep5Page() {
       const data = await res.json()
       setQuestions(data.questions)
       setStats(data.stats)
-      setFinalized(data.session.status === "completed")
+      const initDrafts: Record<number, string> = {}
+      for (const q of data.questions as SessionQuestion[]) {
+        const confident = q.answer_source !== "pending" && q.confidence !== "low"
+        initDrafts[q.question_no] = confident ? q.answer_text : ""
+      }
+      setDrafts((prev) => {
+        const next = { ...initDrafts }
+        for (const [k, v] of Object.entries(prev)) {
+          if (k in next) next[Number(k)] = v
+        }
+        return next
+      })
+      setSavedDrafts(initDrafts)
     }
   }, [sessionId])
 
   useEffect(() => { load() }, [load])
 
-  const openEdit = (q: SessionQuestion) => {
-    setEditQ(q)
-    setEditText(q.answer_text)
-    setAddToCommon(q.add_to_common === 1)
-  }
-
-  const saveEdit = async () => {
-    if (!editQ) return
-    await apiFetch(`/api/sessions/${sessionId}/questions/${editQ.question_no}`, {
+  const saveDraft = async (qno: number) => {
+    setSaving((prev) => ({ ...prev, [qno]: true }))
+    await apiFetch(`/api/sessions/${sessionId}/questions/${qno}`, {
       method: "PUT",
-      body: JSON.stringify({ answer_text: editText, add_to_common: addToCommon }),
+      body: JSON.stringify({ answer_text: drafts[qno] || "", add_to_common: false }),
     })
-    setEditQ(null)
-    load()
+    setSavedDrafts((prev) => ({ ...prev, [qno]: drafts[qno] || "" }))
+    setSaving((prev) => ({ ...prev, [qno]: false }))
   }
 
-  const handleFinalize = async () => {
-    if (!confirm("回答を確定しますか？過去回答DBに自動蓄積されます。")) return
+  const handleAccumulate = async () => {
+    if (!confirm("回答を過去回答DBに蓄積しますか？次回以降のワークフローで再利用されます。")) return
     const res = await apiFetch(`/api/sessions/${sessionId}/step5/finalize`, { method: "PUT" })
     if (res.ok) {
-      setFinalized(true)
+      setAccumulated(true)
       load()
     }
   }
@@ -110,15 +131,15 @@ export default function SessionStep5Page() {
       )}
 
       <div className="flex items-center justify-end gap-2">
-        {!finalized ? (
-          <Button onClick={handleFinalize}>
+        {!accumulated ? (
+          <Button variant="outline" onClick={handleAccumulate}>
             <Check className="h-4 w-4 mr-1" />
-            確定して蓄積
+            過去回答DBに蓄積
           </Button>
         ) : (
-          <span className="text-sm text-green-600 font-medium">確定済み</span>
+          <span className="text-sm text-green-600 font-medium">蓄積済み</span>
         )}
-        <Button variant="outline" onClick={handleExport}>
+        <Button onClick={handleExport}>
           <Download className="h-4 w-4 mr-1" />
           エクスポート
         </Button>
@@ -127,6 +148,7 @@ export default function SessionStep5Page() {
       <div className="space-y-3">
         {questions.map((q) => {
           const src = sourceLabels[q.answer_source] || sourceLabels.pending
+          const message = proposalMessage(q)
           return (
             <Card key={q.question_no} className="py-4 gap-3">
               <CardHeader className="py-0">
@@ -145,13 +167,6 @@ export default function SessionStep5Page() {
                     </span>
                   )}
                 </CardTitle>
-                <CardAction>
-                  {!finalized && (
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(q)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </CardAction>
               </CardHeader>
               <CardContent className="space-y-3 py-0">
                 <div>
@@ -159,14 +174,38 @@ export default function SessionStep5Page() {
                   <p className="text-sm whitespace-pre-wrap">{q.question_text}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">回答</p>
-                  <p className="text-sm whitespace-pre-wrap">
-                    {q.answer_text || <span className="text-muted-foreground italic">未回答</span>}
-                  </p>
-                  {q.source_references.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      参照: {q.source_references.join(", ")}
-                    </p>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">回答案</p>
+                  <div className="flex gap-2 items-start">
+                    <textarea
+                      className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px] resize-y"
+                      value={drafts[q.question_no] ?? ""}
+                      onChange={(e) => setDrafts((prev) => ({ ...prev, [q.question_no]: e.target.value }))}
+                      placeholder="回答を入力してください"
+                    />
+                    {(() => {
+                      const isSaving = saving[q.question_no]
+                      const isChanged = (drafts[q.question_no] ?? "") !== (savedDrafts[q.question_no] ?? "")
+                      if (isSaving) {
+                        return <Button variant="outline" size="sm" className="shrink-0" disabled>保存中...</Button>
+                      }
+                      if (!isChanged) {
+                        return <Button variant="outline" size="sm" className="shrink-0 text-muted-foreground" disabled>保存済み</Button>
+                      }
+                      return (
+                        <Button variant="default" size="sm" className="shrink-0" onClick={() => saveDraft(q.question_no)}>
+                          保存
+                        </Button>
+                      )
+                    })()}
+                  </div>
+                </div>
+                <div className="border-t pt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">AIからの提案</p>
+                  <p className="text-xs text-muted-foreground mb-2 italic">{message}</p>
+                  {q.answer_text ? (
+                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">{q.answer_text}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">提案なし</p>
                   )}
                 </div>
               </CardContent>
@@ -175,37 +214,6 @@ export default function SessionStep5Page() {
         })}
       </div>
 
-      <Dialog open={!!editQ} onOpenChange={(open) => !open && setEditQ(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>回答を編集 (Q{editQ?.question_no})</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">{editQ?.question_text}</div>
-            <div className="space-y-1">
-              <Label>回答</Label>
-              <textarea
-                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[120px]"
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-              />
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={addToCommon}
-                onChange={(e) => setAddToCommon(e.target.checked)}
-                className="rounded"
-              />
-              共通回答DBに追加
-            </label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditQ(null)}>キャンセル</Button>
-            <Button onClick={saveEdit}>保存</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -141,7 +141,7 @@ def _llm_summarize(text: str, file_name: str, api_key: str, model: str) -> str:
     """LLM API を使って構造化サマリを生成する。"""
     import litellm
     prompt = (
-        f"以下はKBドキュメント「{file_name}」の先頭部分です。\n"
+        f"以下はシステム別ナレッジDB「{file_name}」の先頭部分です。\n"
         "このドキュメントの内容を100〜200トークン程度で要約してください。\n"
         "要約には以下を含めてください:\n"
         "- ドキュメントの主題・目的\n"

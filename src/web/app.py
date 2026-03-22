@@ -492,7 +492,7 @@ def create_router(
 
         unresolved = db.get_unresolved_questions(db_path, session_id)
         if not unresolved:
-            db.update_session(db_path, session_id, current_step=5)
+            db.update_session(db_path, session_id, current_step=5, status="completed")
             return {"job_id": None, "message": "生成が必要な質問はありません", "skipped": True}
 
         job_id = pipeline.start_session_pipeline_job(
