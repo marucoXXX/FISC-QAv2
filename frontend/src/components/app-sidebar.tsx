@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { Building2, BookOpen, Home, LogOut, FileText } from "lucide-react"
+import { Building2, BookOpen, Home, LogOut, FileText, FolderOpen } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -24,6 +24,11 @@ const menuItems = [
     title: "共通回答DB",
     url: "/common-answers",
     icon: BookOpen,
+  },
+  {
+    title: "KBフォルダ管理",
+    url: "/kb-folders",
+    icon: FolderOpen,
   },
   {
     title: "セッション",

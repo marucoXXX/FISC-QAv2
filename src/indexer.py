@@ -172,47 +172,55 @@ def _category_from_path(path: Path, kb_dir: Path) -> str:
 
 
 def run_indexer(
-    kb_dir: Path,
+    kb_dir: Path | list[Path],
     previous_index: list[dict] | None = None,
     api_key: str | None = None,
     model: str = "claude-sonnet-4-20250514",
     use_llm_summary: bool = False,
 ) -> list[IndexEntry]:
-    kb_dir = Path(kb_dir)
+    # 単一パスでもリストでも受け付ける
+    if isinstance(kb_dir, (str, Path)):
+        kb_dirs = [Path(kb_dir)]
+    else:
+        kb_dirs = [Path(d) for d in kb_dir]
+
     prev_map: dict[str, str] = {}
     if previous_index:
         for entry in previous_index:
             prev_map[entry["file_name"]] = entry.get("last_modified", "")
 
     entries: list[IndexEntry] = []
-    for f in sorted(kb_dir.rglob("*")):
-        if not f.is_file() or f.name.startswith(".") or f.name.startswith("~$"):
+    for base_dir in kb_dirs:
+        if not base_dir.exists():
             continue
-        if any(part.startswith(".") for part in f.relative_to(kb_dir).parts):
-            continue
-        summary, tokens = _extract_summary(f)
-        last_modified = _file_modified_iso(f)
-        updated = True
-        if f.name in prev_map and prev_map[f.name] == last_modified:
-            updated = False
+        for f in sorted(base_dir.rglob("*")):
+            if not f.is_file() or f.name.startswith(".") or f.name.startswith("~$"):
+                continue
+            if any(part.startswith(".") for part in f.relative_to(base_dir).parts):
+                continue
+            summary, tokens = _extract_summary(f)
+            last_modified = _file_modified_iso(f)
+            updated = True
+            if f.name in prev_map and prev_map[f.name] == last_modified:
+                updated = False
 
-        # LLM要約が有効かつAPIキーがある場合、要約をLLMで生成
-        if use_llm_summary and api_key and summary:
-            try:
-                summary = _llm_summarize(summary, f.name, api_key, model)
-            except Exception:
-                pass  # LLM失敗時はローカル要約をそのまま使う
+            # LLM要約が有効かつAPIキーがある場合、要約をLLMで生成
+            if use_llm_summary and api_key and summary:
+                try:
+                    summary = _llm_summarize(summary, f.name, api_key, model)
+                except Exception:
+                    pass  # LLM失敗時はローカル要約をそのまま使う
 
-        category = _category_from_path(f, kb_dir)
-        entries.append(IndexEntry(
-            file_name=f.name,
-            path=str(f.relative_to(kb_dir)),
-            category=category,
-            summary=summary,
-            estimated_tokens=tokens,
-            last_modified=last_modified,
-            updated=updated,
-        ))
+            category = _category_from_path(f, base_dir)
+            entries.append(IndexEntry(
+                file_name=f.name,
+                path=str(f.relative_to(base_dir)),
+                category=category,
+                summary=summary,
+                estimated_tokens=tokens,
+                last_modified=last_modified,
+                updated=updated,
+            ))
 
     return entries
 

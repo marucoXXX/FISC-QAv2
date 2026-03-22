@@ -95,6 +95,14 @@ class ConfigUpdate(BaseModel):
     token_budget: Optional[int] = None
     output_dir: Optional[str] = None
 
+class KbFolderCreate(BaseModel):
+    path: str
+    label: str = ""
+
+class KbFolderUpdate(BaseModel):
+    path: Optional[str] = None
+    label: Optional[str] = None
+
 
 def create_router(
     db_path: Path,
@@ -771,13 +779,19 @@ def create_router(
         tmp.write(content)
         tmp.close()
 
-        kb_dir = Path(config.kb_dir)
-        if not kb_dir.exists():
-            raise HTTPException(400, f"KB ディレクトリが見つかりません: {kb_dir}")
+        kb_folders = db.list_kb_folders(db_path)
+        if kb_folders:
+            kb_dirs = [Path(f["path"]) for f in kb_folders]
+        else:
+            kb_dirs = [Path(config.kb_dir)]
+
+        existing_dirs = [d for d in kb_dirs if d.exists()]
+        if not existing_dirs:
+            raise HTTPException(400, f"KB ディレクトリが見つかりません: {kb_dirs}")
 
         job_id = pipeline.start_pipeline_job(
             questionnaire_path=Path(tmp.name),
-            kb_dir=kb_dir,
+            kb_dirs=existing_dirs,
             config=config,
             db_path=db_path,
         )
@@ -806,6 +820,31 @@ def create_router(
             "result_run_id": job.result_run_id,
             "error": job.error,
         }
+
+    # --- KB Folders API ---
+
+    @router.get("/api/kb-folders")
+    def list_kb_folders() -> list[dict]:
+        return db.list_kb_folders(db_path)
+
+    @router.post("/api/kb-folders", status_code=201)
+    def create_kb_folder(req: KbFolderCreate) -> dict:
+        folder_id = db.create_kb_folder(db_path, path=req.path, label=req.label)
+        return {"id": folder_id}
+
+    @router.put("/api/kb-folders/{folder_id}")
+    def update_kb_folder(folder_id: int, req: KbFolderUpdate) -> dict:
+        updated = db.update_kb_folder(db_path, folder_id, **req.model_dump(exclude_none=True))
+        if not updated:
+            raise HTTPException(404, "KB folder not found")
+        return {"ok": True}
+
+    @router.delete("/api/kb-folders/{folder_id}")
+    def delete_kb_folder(folder_id: int) -> dict:
+        deleted = db.delete_kb_folder(db_path, folder_id)
+        if not deleted:
+            raise HTTPException(404, "KB folder not found")
+        return {"ok": True}
 
     # --- Config API ---
 

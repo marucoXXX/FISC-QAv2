@@ -160,6 +160,15 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
     uploaded_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_uf_bank ON uploaded_files(bank_id);
+
+-- KBフォルダ管理
+CREATE TABLE IF NOT EXISTS kb_folders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL UNIQUE,
+    label TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -744,3 +753,44 @@ def _update_run_counts(conn: sqlite3.Connection, run_id: int) -> None:
         "UPDATE runs SET approved_count=?, rejected_count=?, pending_count=? WHERE id=?",
         (row[0] or 0, row[1] or 0, row[2] or 0, run_id),
     )
+
+
+# ===== KB Folders CRUD =====
+
+
+def create_kb_folder(db_path: Path, path: str, label: str = "") -> int:
+    now = datetime.now().isoformat()
+    with get_conn(db_path) as conn:
+        cur = conn.execute(
+            "INSERT INTO kb_folders (path, label, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?)",
+            (path, label, now, now),
+        )
+        return cur.lastrowid
+
+
+def list_kb_folders(db_path: Path) -> list[dict]:
+    with get_conn(db_path) as conn:
+        rows = conn.execute(
+            "SELECT * FROM kb_folders ORDER BY id"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_kb_folder(db_path: Path, folder_id: int, **fields) -> bool:
+    allowed = {"path", "label"}
+    updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
+    if not updates:
+        return False
+    updates["updated_at"] = datetime.now().isoformat()
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    values = list(updates.values()) + [folder_id]
+    with get_conn(db_path) as conn:
+        cur = conn.execute(f"UPDATE kb_folders SET {set_clause} WHERE id = ?", values)
+        return cur.rowcount > 0
+
+
+def delete_kb_folder(db_path: Path, folder_id: int) -> bool:
+    with get_conn(db_path) as conn:
+        cur = conn.execute("DELETE FROM kb_folders WHERE id = ?", (folder_id,))
+        return cur.rowcount > 0

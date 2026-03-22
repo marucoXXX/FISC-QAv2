@@ -20,11 +20,19 @@ def _log(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
 
 
-def _load_past_answers(kb_dir: Path) -> dict[str, dict]:
+def _load_past_answers(kb_dirs: list[Path]) -> dict[str, dict]:
     """過去回答をロードする。質問IDをキーとした辞書を返す。"""
-    past_dir = kb_dir / "past_answers"
-    if not past_dir.exists():
-        return {}
+    all_past: dict[str, dict] = {}
+    for kb_dir in kb_dirs:
+        past_dir = kb_dir / "past_answers"
+        if not past_dir.exists():
+            continue
+        all_past.update(_load_past_answers_from_dir(past_dir))
+    return all_past
+
+
+def _load_past_answers_from_dir(past_dir: Path) -> dict[str, dict]:
+    """1つのpast_answersディレクトリから過去回答をロードする。"""
 
     from openpyxl import load_workbook
 
@@ -75,7 +83,7 @@ def _find_related_files(
 def _run_single_reader(
     assignment: ReaderAssignment,
     questions: list[Question],
-    kb_dir: Path,
+    kb_dirs: list[Path],
     config: Config,
 ) -> list[Answer]:
     """1つの Reader を最大 max_retries 回リトライ付きで実行する。"""
@@ -88,7 +96,7 @@ def _run_single_reader(
                 reader_id=assignment.reader_id,
                 questions=assigned_qs,
                 files=assignment.files,
-                kb_base_dir=kb_dir,
+                kb_base_dir=kb_dirs,
                 api_key=config.api_key,
                 model=config.model,
             )
@@ -118,7 +126,7 @@ def _run_single_reader(
 def _run_readers_parallel(
     readers: list[ReaderAssignment],
     questions: list[Question],
-    kb_dir: Path,
+    kb_dirs: list[Path],
     config: Config,
 ) -> list[Answer]:
     """全 Reader を ThreadPoolExecutor で並列実行し、結果を集約する。"""
@@ -126,7 +134,7 @@ def _run_readers_parallel(
 
     with ThreadPoolExecutor(max_workers=len(readers)) as executor:
         futures = {
-            executor.submit(_run_single_reader, r, questions, kb_dir, config): r
+            executor.submit(_run_single_reader, r, questions, kb_dirs, config): r
             for r in readers
         }
         for future in as_completed(futures):
@@ -152,12 +160,15 @@ def _run_readers_parallel(
 
 def run_pipeline(
     questionnaire_path: str | Path,
-    kb_dir: str | Path,
+    kb_dir: str | Path | list[Path],
     config: Config | None = None,
 ) -> Path:
     config = config or Config()
     questionnaire_path = Path(questionnaire_path)
-    kb_dir = Path(kb_dir)
+    if isinstance(kb_dir, (str, Path)):
+        kb_dirs = [Path(kb_dir)]
+    else:
+        kb_dirs = [Path(d) for d in kb_dir]
 
     # [1/5] 質問票読み込み
     questions = read_questionnaire(questionnaire_path)
@@ -165,7 +176,7 @@ def run_pipeline(
 
     # [2/5] インデックス生成 + 更新検知
     previous_index = load_index(Path(config.index_cache_path))
-    index_entries = run_indexer(kb_dir, previous_index=previous_index or None)
+    index_entries = run_indexer(kb_dirs, previous_index=previous_index or None)
     save_index(index_entries, Path(config.index_cache_path))
     index_dicts = index_to_dicts(index_entries)
 
@@ -194,7 +205,7 @@ def run_pipeline(
                 if fp not in routing_map[qno]:
                     routing_map[qno].append(fp)
 
-    past_answers = _load_past_answers(kb_dir)
+    past_answers = _load_past_answers(kb_dirs)
     reused: dict[int, Answer] = {}
     new_questions: list[Question] = []
 
@@ -233,7 +244,7 @@ def run_pipeline(
 
         # [4/5] Reader 並列実行（Fan-out → Fan-in）
         reader_results = _run_readers_parallel(
-            routing.readers, new_questions, kb_dir, config,
+            routing.readers, new_questions, kb_dirs, config,
         )
 
         success_count = 0

@@ -11,6 +11,7 @@ import SessionStep2Page from "@/pages/SessionStep2Page"
 import SessionStep3Page from "@/pages/SessionStep3Page"
 import SessionStep4Page from "@/pages/SessionStep4Page"
 import SessionStep5Page from "@/pages/SessionStep5Page"
+import KbFoldersPage from "@/pages/KbFoldersPage"
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -55,6 +56,7 @@ function AppRoutes() {
       <Route path="/banks" element={<P title="銀行管理"><BankListPage /></P>} />
       <Route path="/banks/:bankId" element={<P title="銀行詳細"><BankDetailPage /></P>} />
       <Route path="/common-answers" element={<P title="共通回答DB"><CommonAnswersPage /></P>} />
+      <Route path="/kb-folders" element={<P title="KBフォルダ管理"><KbFoldersPage /></P>} />
       <Route path="/sessions" element={<P title="セッション"><SessionListPage /></P>} />
       <Route path="/sessions/new" element={<P title="新規セッション"><SessionNewPage /></P>} />
       <Route path="/sessions/:sessionId/step2" element={<P title="過去回答マッチング"><SessionStep2Page /></P>} />

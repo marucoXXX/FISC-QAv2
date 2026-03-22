@@ -44,7 +44,7 @@ class _ProgressCapture(io.TextIOBase):
 
 def start_pipeline_job(
     questionnaire_path: Path,
-    kb_dir: Path,
+    kb_dirs: list[Path],
     config: Config,
     db_path: Path,
 ) -> str:
@@ -54,7 +54,7 @@ def start_pipeline_job(
 
     thread = threading.Thread(
         target=_run_pipeline_thread,
-        args=(job, questionnaire_path, kb_dir, config, db_path),
+        args=(job, questionnaire_path, kb_dirs, config, db_path),
         daemon=True,
     )
     thread.start()
@@ -64,7 +64,7 @@ def start_pipeline_job(
 def _run_pipeline_thread(
     job: JobState,
     questionnaire_path: Path,
-    kb_dir: Path,
+    kb_dirs: list[Path],
     config: Config,
     db_path: Path,
 ) -> None:
@@ -84,7 +84,7 @@ def _run_pipeline_thread(
         old_stderr = sys.stderr
         sys.stderr = capture  # type: ignore[assignment]
         try:
-            output_path = run_pipeline(questionnaire_path, kb_dir, config)
+            output_path = run_pipeline(questionnaire_path, kb_dirs, config)
         finally:
             sys.stderr = old_stderr
 
@@ -168,11 +168,17 @@ def _run_session_pipeline_thread(
 
         try:
             # Use existing pipeline for generation
-            kb_dir = Path(config.kb_dir)
+            from . import db as web_db
+            kb_folders = web_db.list_kb_folders(db_path)
+            if kb_folders:
+                kb_dirs = [Path(f["path"]) for f in kb_folders]
+            else:
+                kb_dirs = [Path(config.kb_dir)]
             source_path = Path(session.get("source_file_path", ""))
 
-            if source_path.exists() and kb_dir.exists():
-                output_path = run_pipeline(source_path, kb_dir, config)
+            existing_dirs = [d for d in kb_dirs if d.exists()]
+            if source_path.exists() and existing_dirs:
+                output_path = run_pipeline(source_path, existing_dirs, config)
 
                 # Parse results and update session questions
                 from ..web.app import _parse_excel

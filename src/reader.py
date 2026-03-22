@@ -119,17 +119,24 @@ def run_reader(
     reader_id: str,
     questions: list[Question],
     files: list[str],
-    kb_base_dir: Path,
+    kb_base_dir: Path | list[Path],
     api_key: str,
     model: str = "claude-sonnet-4-20250514",
 ) -> list[Answer]:
+    if isinstance(kb_base_dir, (str, Path)):
+        kb_base_dirs = [Path(kb_base_dir)]
+    else:
+        kb_base_dirs = [Path(d) for d in kb_base_dir]
+
     file_contents: dict[str, str] = {}
     for fpath in files:
-        full_path = kb_base_dir / fpath
-        if full_path.exists():
-            file_contents[fpath] = _read_file_content(full_path)
-        else:
-            file_contents[fpath] = f"[ファイルが見つかりません: {fpath}]"
+        content = None
+        for base_dir in kb_base_dirs:
+            full_path = base_dir / fpath
+            if full_path.exists():
+                content = _read_file_content(full_path)
+                break
+        file_contents[fpath] = content if content is not None else f"[ファイルが見つかりません: {fpath}]"
 
     user_prompt = _build_user_prompt(questions, file_contents)
 
