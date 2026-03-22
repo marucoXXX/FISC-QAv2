@@ -676,6 +676,12 @@ def get_session(db_path: Path, session_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+def delete_session(db_path: Path, session_id: int) -> bool:
+    with get_conn(db_path) as conn:
+        cur = conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        return cur.rowcount > 0
+
+
 def update_session(db_path: Path, session_id: int, **fields) -> bool:
     allowed = {"current_step", "status", "name"}
     updates = {k: v for k, v in fields.items() if k in allowed and v is not None}

@@ -353,6 +353,13 @@ def create_router(
             raise HTTPException(404)
         return s
 
+    @router.delete("/api/sessions/{session_id}")
+    def delete_session(session_id: int) -> dict:
+        ok = db.delete_session(db_path, session_id)
+        if not ok:
+            raise HTTPException(404)
+        return {"ok": True}
+
     @router.get("/api/sessions/{session_id}/questions")
     def get_session_questions(session_id: int) -> list[dict]:
         return db.get_session_questions(db_path, session_id)

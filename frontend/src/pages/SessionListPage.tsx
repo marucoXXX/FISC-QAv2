@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { Link } from "react-router-dom"
-import { Plus, FileText } from "lucide-react"
+import { Plus, FileText, Trash2 } from "lucide-react"
 import { apiFetch } from "@/lib/httpClient"
 import { Button } from "@/components/ui/button"
 import {
@@ -39,6 +39,12 @@ export default function SessionListPage() {
 
   useEffect(() => { load() }, [load])
 
+  const handleDelete = async (id: number) => {
+    if (!confirm("このワークフローを削除しますか？")) return
+    const res = await apiFetch(`/api/sessions/${id}`, { method: "DELETE" })
+    if (res.ok) load()
+  }
+
   const getStepUrl = (s: Session) => {
     if (s.status === "completed") return `/sessions/${s.id}/step5`
     return `/sessions/${s.id}/step${s.current_step}`
@@ -65,12 +71,13 @@ export default function SessionListPage() {
             <TableHead>ステップ</TableHead>
             <TableHead>ステータス</TableHead>
             <TableHead>作成日</TableHead>
+            <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {sessions.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 ワークフローがありません
               </TableCell>
             </TableRow>
@@ -97,6 +104,11 @@ export default function SessionListPage() {
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">
                 {new Date(s.created_at).toLocaleDateString("ja-JP")}
+              </TableCell>
+              <TableCell>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(s.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </TableCell>
             </TableRow>
           ))}
