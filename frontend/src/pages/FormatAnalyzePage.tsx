@@ -530,12 +530,15 @@ export default function FormatAnalyzePage() {
               <textarea className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px]"
                 value={headingPattern} onChange={(e) => setHeadingPattern(e.target.value)}
                 placeholder="例: 番号列が空で、質問列に【】で囲まれたテキストのみの行は見出し行" />
-              {headingPattern && (
+              {headingPattern ? (
                 <p className="text-xs text-muted-foreground bg-blue-50 rounded px-2 py-1 mt-2">
-                  AIが見出し行パターンを検出しました。内容を確認・修正してください。
+                  AIが見出し行パターンを提案しました。内容を確認・修正してください。
                 </p>
-              )}
-              {!headingPattern && (
+              ) : detectedHeadings.length > 0 ? (
+                <p className="text-xs text-muted-foreground bg-amber-50 rounded px-2 py-1 mt-2">
+                  AIは見出し行パターンを記述しませんでしたが、構造ルールにより見出し行が検出されています（下記参照）。必要に応じてパターンを記述してください。
+                </p>
+              ) : (
                 <p className="text-xs text-muted-foreground mt-1">
                   見出し行がない場合は空欄のままで構いません。
                 </p>
