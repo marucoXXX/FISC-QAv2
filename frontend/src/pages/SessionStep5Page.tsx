@@ -183,11 +183,11 @@ export default function SessionStep5Page() {
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <span className="font-mono text-muted-foreground">#{q.question_no}</span>
                   <span className={`text-xs px-2 py-0.5 rounded ${src.color}`}>{src.label}</span>
-                  {q.confidence && q.confidence !== "low" && (
+                  {q.confidence && (
                     <span className={`text-xs px-2 py-0.5 rounded ${
                       q.confidence === "high" ? "bg-emerald-100 text-emerald-700" :
                       q.confidence === "medium" ? "bg-amber-100 text-amber-700" :
-                      "bg-gray-100 text-gray-500"
+                      "bg-red-100 text-red-700"
                     }`}>
                       AI確信度: {q.confidence === "high" ? "高" : q.confidence === "medium" ? "中" : "低"}
                     </span>
