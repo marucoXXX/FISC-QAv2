@@ -554,14 +554,24 @@ def create_router(
             choices_col=qf["choices_col"] if qf else "",
             remarks_col=qf["remarks_col"] if qf else "",
         )
-        questions = read_questionnaire(stored_path, fc)
+        # column_definitions をパースして読み取り列抽出に使用
+        col_defs_list = None
+        col_defs_raw = qf.get("column_definitions", "[]") if qf else "[]"
+        if col_defs_raw and col_defs_raw != "[]":
+            try:
+                col_defs_list = json.loads(col_defs_raw)
+            except (ValueError, TypeError):
+                pass
+
+        questions = read_questionnaire(stored_path, fc, column_definitions=col_defs_list)
         if not questions:
             raise HTTPException(400, "質問を抽出できませんでした")
 
         db.bulk_add_session_questions(db_path, session_id, [
             {"question_no": q.question_no, "major": q.major,
              "minor": q.minor, "question_text": q.question_text,
-             "choices_text": q.choices_text, "remarks_text": q.remarks_text}
+             "choices_text": q.choices_text, "remarks_text": q.remarks_text,
+             "extra_columns": json.dumps(q.extra_columns, ensure_ascii=False) if q.extra_columns else "{}"}
             for q in questions
         ])
 

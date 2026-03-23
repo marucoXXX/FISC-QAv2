@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { StepIndicator } from "@/components/StepIndicator"
+import { ExtraColumnsDisplay } from "@/components/ExtraColumnsDisplay"
 
 type SessionQuestion = {
   question_no: number
@@ -19,6 +20,7 @@ type SessionQuestion = {
   matched_common_id: number | null
   common_answer_text: string
   answer_source: string
+  extra_columns?: string
 }
 
 export default function SessionStep3Page() {
@@ -129,6 +131,7 @@ export default function SessionStep3Page() {
                     <TableCell className="font-mono text-xs">{q.question_no}</TableCell>
                     <TableCell className="text-sm">
                       <div className="whitespace-pre-wrap">{q.question_text}</div>
+                      <ExtraColumnsDisplay extraColumnsRaw={q.extra_columns} />
                     </TableCell>
                     <TableCell className="text-sm">
                       {hasMatch ? (

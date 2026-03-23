@@ -184,6 +184,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         ("bank_qa_files", "analysis_confirmed", "INTEGER NOT NULL DEFAULT 0"),
         ("bank_qa_files", "column_definitions", "TEXT NOT NULL DEFAULT '[]'"),
         ("bank_qa_files", "row_structure", "TEXT NOT NULL DEFAULT ''"),
+        ("session_questions", "extra_columns", "TEXT NOT NULL DEFAULT '{}'"),
     ]
     for table, col, col_def in migrations:
         try:
@@ -714,11 +715,12 @@ def bulk_add_session_questions(
         conn.executemany(
             "INSERT INTO session_questions "
             "(session_id, question_no, major, minor, question_text, "
-            "choices_text, remarks_text) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "choices_text, remarks_text, extra_columns) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [(session_id, q["question_no"], q.get("major", ""),
               q.get("minor", ""), q.get("question_text", ""),
-              q.get("choices_text", ""), q.get("remarks_text", ""))
+              q.get("choices_text", ""), q.get("remarks_text", ""),
+              q.get("extra_columns", "{}"))
              for q in questions],
         )
         return len(questions)

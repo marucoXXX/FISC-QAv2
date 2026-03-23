@@ -107,6 +107,11 @@ class Question:
     minor: str = ""
     choices_text: str = ""
     remarks_text: str = ""
+    extra_columns: dict = None  # type: ignore[assignment]
+
+    def __post_init__(self):
+        if self.extra_columns is None:
+            self.extra_columns = {}
 
 
 def _col_letter_to_index(col: str) -> int:
@@ -116,13 +121,21 @@ def _col_letter_to_index(col: str) -> int:
     return result - 1
 
 
-def read_questionnaire(path: Path, config: FormatConfig) -> list[Question]:
+def read_questionnaire(
+    path: Path,
+    config: FormatConfig,
+    column_definitions: list | None = None,
+) -> list[Question]:
     if config.file_format == "docx":
-        return _read_docx_questionnaire(path, config)
-    return _read_xlsx_questionnaire(path, config)
+        return _read_docx_questionnaire(path, config, column_definitions)
+    return _read_xlsx_questionnaire(path, config, column_definitions)
 
 
-def _read_xlsx_questionnaire(path: Path, config: FormatConfig) -> list[Question]:
+def _read_xlsx_questionnaire(
+    path: Path,
+    config: FormatConfig,
+    column_definitions: list | None = None,
+) -> list[Question]:
     from openpyxl import load_workbook
 
     wb = load_workbook(str(path), read_only=True, data_only=True)
@@ -130,6 +143,14 @@ def _read_xlsx_questionnaire(path: Path, config: FormatConfig) -> list[Question]
     q_idx = _col_letter_to_index(config.question_col)
     c_idx = _col_letter_to_index(config.choices_col) if config.choices_col else -1
     r_idx = _col_letter_to_index(config.remarks_col) if config.remarks_col else -1
+
+    # 読み取り列（question以外）のインデックスマップ
+    extra_col_map: list[tuple[int, dict]] = []
+    if column_definitions:
+        for d in column_definitions:
+            if d.get("role") in _ROLES_READ and d.get("role") != "question":
+                idx = _col_letter_to_index(d["col"])
+                extra_col_map.append((idx, d))
 
     questions = []
     for i, row in enumerate(ws.iter_rows(min_row=config.data_start_row, values_only=True), start=1):
@@ -142,6 +163,17 @@ def _read_xlsx_questionnaire(path: Path, config: FormatConfig) -> list[Question]
         minor = str(row[2] or "").strip() if len(row) > 2 else ""
         choices = str(row[c_idx] or "").strip() if 0 <= c_idx < len(row) else ""
         remarks = str(row[r_idx] or "").strip() if 0 <= r_idx < len(row) else ""
+
+        extra = {}
+        for idx, d in extra_col_map:
+            val = str(row[idx] or "").strip() if idx < len(row) else ""
+            if val:
+                extra[d["col"]] = {
+                    "role": d["role"],
+                    "description": d.get("description", ""),
+                    "value": val,
+                }
+
         questions.append(Question(
             question_no=i,
             question_text=q_text,
@@ -149,13 +181,18 @@ def _read_xlsx_questionnaire(path: Path, config: FormatConfig) -> list[Question]
             minor=minor,
             choices_text=choices,
             remarks_text=remarks,
+            extra_columns=extra,
         ))
 
     wb.close()
     return questions
 
 
-def _read_docx_questionnaire(path: Path, config: FormatConfig) -> list[Question]:
+def _read_docx_questionnaire(
+    path: Path,
+    config: FormatConfig,
+    column_definitions: list | None = None,
+) -> list[Question]:
     from docx import Document
 
     doc = Document(str(path))
@@ -166,6 +203,13 @@ def _read_docx_questionnaire(path: Path, config: FormatConfig) -> list[Question]
     q_idx = _col_letter_to_index(config.question_col)
     c_idx = _col_letter_to_index(config.choices_col) if config.choices_col else -1
     r_idx = _col_letter_to_index(config.remarks_col) if config.remarks_col else -1
+
+    extra_col_map: list[tuple[int, dict]] = []
+    if column_definitions:
+        for d in column_definitions:
+            if d.get("role") in _ROLES_READ and d.get("role") != "question":
+                idx = _col_letter_to_index(d["col"])
+                extra_col_map.append((idx, d))
 
     questions = []
     no = 0
@@ -183,6 +227,17 @@ def _read_docx_questionnaire(path: Path, config: FormatConfig) -> list[Question]
         minor = cells[2].text.strip() if len(cells) > 2 else ""
         choices = cells[c_idx].text.strip() if 0 <= c_idx < len(cells) else ""
         remarks = cells[r_idx].text.strip() if 0 <= r_idx < len(cells) else ""
+
+        extra = {}
+        for idx, d in extra_col_map:
+            val = cells[idx].text.strip() if idx < len(cells) else ""
+            if val:
+                extra[d["col"]] = {
+                    "role": d["role"],
+                    "description": d.get("description", ""),
+                    "value": val,
+                }
+
         questions.append(Question(
             question_no=no,
             question_text=q_text,
@@ -190,6 +245,7 @@ def _read_docx_questionnaire(path: Path, config: FormatConfig) -> list[Question]
             minor=minor,
             choices_text=choices,
             remarks_text=remarks,
+            extra_columns=extra,
         ))
 
     return questions

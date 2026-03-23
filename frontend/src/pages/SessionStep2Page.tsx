@@ -6,6 +6,7 @@ import { diffWords } from "@/lib/textDiff"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card"
 import { StepIndicator } from "@/components/StepIndicator"
+import { ExtraColumnsDisplay } from "@/components/ExtraColumnsDisplay"
 
 type SessionQuestion = {
   question_no: number
@@ -18,6 +19,7 @@ type SessionQuestion = {
   match_judgment: string
   match_reason: string
   answer_source: string
+  extra_columns?: string
 }
 
 export default function SessionStep2Page() {
@@ -173,6 +175,7 @@ export default function SessionStep2Page() {
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-1">今回の質問</p>
                       <p className="text-sm whitespace-pre-wrap">{q.question_text}</p>
+                      <ExtraColumnsDisplay extraColumnsRaw={q.extra_columns} />
                     </div>
                     {hasMatch && (
                       <>

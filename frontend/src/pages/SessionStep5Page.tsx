@@ -5,6 +5,7 @@ import { apiFetch, getApiBaseUrl } from "@/lib/httpClient"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StepIndicator } from "@/components/StepIndicator"
+import { ExtraColumnsDisplay } from "@/components/ExtraColumnsDisplay"
 
 type SessionQuestion = {
   question_no: number
@@ -17,6 +18,7 @@ type SessionQuestion = {
   confidence: string
   add_to_common: number
   assessment_mark: string
+  extra_columns?: string
 }
 
 type Stats = {
@@ -172,6 +174,7 @@ export default function SessionStep5Page() {
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-1">質問</p>
                   <p className="text-sm whitespace-pre-wrap">{q.question_text}</p>
+                  <ExtraColumnsDisplay extraColumnsRaw={q.extra_columns} />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-1">回答案</p>
