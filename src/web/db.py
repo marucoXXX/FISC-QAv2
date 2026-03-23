@@ -184,7 +184,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
         ("bank_qa_files", "analysis_confirmed", "INTEGER NOT NULL DEFAULT 0"),
         ("bank_qa_files", "column_definitions", "TEXT NOT NULL DEFAULT '[]'"),
         ("bank_qa_files", "row_structure", "TEXT NOT NULL DEFAULT ''"),
+        ("bank_qa_files", "heading_pattern", "TEXT NOT NULL DEFAULT ''"),
         ("session_questions", "extra_columns", "TEXT NOT NULL DEFAULT '{}'"),
+        ("session_questions", "is_heading", "INTEGER NOT NULL DEFAULT 0"),
     ]
     for table, col, col_def in migrations:
         try:
@@ -470,6 +472,7 @@ def create_bank_qa_file(
     analysis_confirmed: int = 0,
     column_definitions: str = "[]",
     row_structure: str = "",
+    heading_pattern: str = "",
 ) -> int:
     now = datetime.now().isoformat()
     with get_conn(db_path) as conn:
@@ -477,13 +480,13 @@ def create_bank_qa_file(
             "INSERT INTO bank_qa_files (bank_id, qa_file_name, file_format, "
             "question_col, answer_col, header_row, data_start_row, table_index, "
             "format_type, choices_col, remarks_col, analysis_confirmed, "
-            "column_definitions, row_structure, "
+            "column_definitions, row_structure, heading_pattern, "
             "created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (bank_id, qa_file_name, file_format, question_col, answer_col,
              header_row, data_start_row, table_index,
              format_type, choices_col, remarks_col, analysis_confirmed,
-             column_definitions, row_structure, now, now),
+             column_definitions, row_structure, heading_pattern, now, now),
         )
         return cur.lastrowid
 
@@ -676,7 +679,7 @@ def get_session(db_path: Path, session_id: int) -> dict | None:
             "qf.qa_file_name, qf.file_format, qf.question_col, qf.answer_col, "
             "qf.header_row, qf.data_start_row, qf.table_index, "
             "qf.format_type, qf.choices_col, qf.remarks_col, "
-            "qf.column_definitions, qf.row_structure "
+            "qf.column_definitions, qf.row_structure, qf.heading_pattern "
             "FROM sessions s "
             "JOIN banks b ON s.bank_id = b.id "
             "LEFT JOIN bank_qa_files qf ON s.qa_file_id = qf.id "
@@ -715,12 +718,12 @@ def bulk_add_session_questions(
         conn.executemany(
             "INSERT INTO session_questions "
             "(session_id, question_no, major, minor, question_text, "
-            "choices_text, remarks_text, extra_columns) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "choices_text, remarks_text, extra_columns, is_heading) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [(session_id, q["question_no"], q.get("major", ""),
               q.get("minor", ""), q.get("question_text", ""),
               q.get("choices_text", ""), q.get("remarks_text", ""),
-              q.get("extra_columns", "{}"))
+              q.get("extra_columns", "{}"), q.get("is_heading", 0))
              for q in questions],
         )
         return len(questions)

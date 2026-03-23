@@ -123,6 +123,7 @@ export default function FormatAnalyzePage() {
   // Column definitions (Step B)
   const [columnDefs, setColumnDefs] = useState<ColumnDef[]>([])
   const [rowStructure, setRowStructure] = useState("")
+  const [headingPattern, setHeadingPattern] = useState("")
 
   // Word
   const [selectedTableIndex, setSelectedTableIndex] = useState(0)
@@ -223,6 +224,7 @@ export default function FormatAnalyzePage() {
       if (!res.ok) { setError(data.detail || "列分析に失敗しました"); return }
       setColumnDefs(data.column_definitions || [])
       setRowStructure(data.row_structure || "")
+      setHeadingPattern(data.heading_pattern || "")
       setStep("columns")
     } finally {
       setAnalyzingColumns(false)
@@ -246,6 +248,7 @@ export default function FormatAnalyzePage() {
           table_index: selectedTableIndex,
           column_definitions: columnDefs,
           row_structure: rowStructure,
+          heading_pattern: headingPattern,
         }),
       })
       const data = await res.json()
@@ -511,6 +514,30 @@ export default function FormatAnalyzePage() {
               <p className="text-xs text-muted-foreground bg-blue-50 rounded px-2 py-1">
                 上記はAIが自動生成した説明です。特に、質問ではない行（大分類の見出し行など）がある場合はその旨を記載すると、AIの回答精度が向上します。
               </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>見出し行パターン</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                データ行の中に見出し行（セクション区切り等、質問ではない行）がある場合、その識別方法を記述してください。
+              </p>
+            </CardHeader>
+            <CardContent>
+              <textarea className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px]"
+                value={headingPattern} onChange={(e) => setHeadingPattern(e.target.value)}
+                placeholder="例: 番号列が空で、質問列に【】で囲まれたテキストのみの行は見出し行" />
+              {headingPattern && (
+                <p className="text-xs text-muted-foreground bg-blue-50 rounded px-2 py-1 mt-2">
+                  AIが見出し行パターンを検出しました。内容を確認・修正してください。
+                </p>
+              )}
+              {!headingPattern && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  見出し行がない場合は空欄のままで構いません。
+                </p>
+              )}
             </CardContent>
           </Card>
 

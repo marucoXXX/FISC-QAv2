@@ -424,13 +424,17 @@ _COLUMN_DEFS_SYSTEM_PROMPT = """\
 また、行の構造を自然言語で説明してください。
 この説明は、回答生成AIに「このアンケートの各行がどういう構造か」を伝えるために使います。
 
+また、データ行の中に「見出し行」（セクション区切り、大分類の見出しなど、質問ではない行）が
+あるかどうかを判定してください。ある場合、見出し行の識別方法を heading_pattern フィールドに記述してください。
+
 以下のJSON形式で回答してください:
 {
   "column_definitions": [
     {"col": "A", "role": "number", "description": "通し番号"},
     {"col": "E", "role": "question", "description": "規定内容・確認事項"}
   ],
-  "row_structure": "各行は1つの確認項目に対応。A列に通番、B-C列に分類、E列に質問、F列に回答を記入。"
+  "row_structure": "各行は1つの確認項目に対応。A列に通番、B-C列に分類、E列に質問、F列に回答を記入。",
+  "heading_pattern": "番号列(A列)が空で、質問列にのみテキストがある行は見出し行"
 }
 """
 
@@ -517,6 +521,7 @@ def analyze_columns(
         return _default_column_defs_suggestion(preview)
 
     result.setdefault("row_structure", "")
+    result.setdefault("heading_pattern", "")
     return result
 
 

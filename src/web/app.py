@@ -343,6 +343,7 @@ def create_router(
         # column_definitions から旧カラム（question_col等）を導出
         col_defs = req.get("column_definitions", [])
         row_structure = req.get("row_structure", "")
+        heading_pattern = req.get("heading_pattern", "")
         col_defs_json = json.dumps(col_defs, ensure_ascii=False) if isinstance(col_defs, list) else str(col_defs)
 
         from ..file_io import derive_format_config
@@ -369,6 +370,7 @@ def create_router(
                 analysis_confirmed=1,
                 column_definitions=col_defs_json,
                 row_structure=row_structure,
+                heading_pattern=heading_pattern,
             )
         except Exception as e:
             if "UNIQUE" in str(e):
@@ -563,7 +565,12 @@ def create_router(
             except (ValueError, TypeError):
                 pass
 
-        questions = read_questionnaire(stored_path, fc, column_definitions=col_defs_list)
+        heading_pat = qf.get("heading_pattern", "") if qf else ""
+        questions = read_questionnaire(
+            stored_path, fc,
+            column_definitions=col_defs_list,
+            heading_pattern=heading_pat,
+        )
         if not questions:
             raise HTTPException(400, "質問を抽出できませんでした")
 
@@ -571,7 +578,8 @@ def create_router(
             {"question_no": q.question_no, "major": q.major,
              "minor": q.minor, "question_text": q.question_text,
              "choices_text": q.choices_text, "remarks_text": q.remarks_text,
-             "extra_columns": json.dumps(q.extra_columns, ensure_ascii=False) if q.extra_columns else "{}"}
+             "extra_columns": json.dumps(q.extra_columns, ensure_ascii=False) if q.extra_columns else "{}",
+             "is_heading": 1 if q.is_heading else 0}
             for q in questions
         ])
 

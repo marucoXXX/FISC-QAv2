@@ -18,6 +18,7 @@ type SessionQuestion = {
   add_to_common: number
   assessment_mark: string
   extra_columns?: string
+  is_heading?: number
 }
 
 type ColumnDef = {
@@ -176,6 +177,21 @@ export default function SessionStep5Page() {
           const src = sourceLabels[q.answer_source] || sourceLabels.pending
           const message = proposalMessage(q)
           const extras = parseExtraCols(q.extra_columns)
+
+          // Heading row: show minimal card
+          if (q.is_heading) {
+            return (
+              <Card key={q.question_no} className="py-2 gap-0 bg-muted/30">
+                <CardHeader className="py-0">
+                  <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="font-mono">#{q.question_no}</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500">見出し行</span>
+                    <span className="font-medium">{q.question_text}</span>
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+            )
+          }
 
           return (
             <Card key={q.question_no} className="py-4 gap-3">

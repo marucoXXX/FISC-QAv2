@@ -108,6 +108,7 @@ class Question:
     choices_text: str = ""
     remarks_text: str = ""
     extra_columns: dict = None  # type: ignore[assignment]
+    is_heading: bool = False
 
     def __post_init__(self):
         if self.extra_columns is None:
@@ -121,20 +122,51 @@ def _col_letter_to_index(col: str) -> int:
     return result - 1
 
 
+def _detect_heading(q: Question, heading_pattern: str, number_col_idx: int = -1, row_values: tuple = ()) -> bool:
+    """heading_pattern に基づいて見出し行かどうかを判定する簡易ルールエンジン."""
+    if not heading_pattern:
+        return False
+    pat = heading_pattern.lower()
+    text = q.question_text
+
+    # ルール: 番号列が空
+    if ("番号" in pat and "空" in pat) or ("number" in pat and "empty" in pat):
+        if number_col_idx >= 0 and number_col_idx < len(row_values):
+            num_val = str(row_values[number_col_idx] or "").strip()
+            if not num_val and text:
+                return True
+
+    # ルール: 【】で囲まれた
+    if "【" in pat or "brackets" in pat:
+        import re
+        if re.match(r"^【.+】$", text.strip()):
+            return True
+
+    # ルール: 質問列にのみテキスト（他の列が空）
+    if "のみ" in pat or "only" in pat:
+        non_empty_count = sum(1 for v in row_values if str(v or "").strip())
+        if non_empty_count <= 2 and text:  # question + maybe one more
+            return True
+
+    return False
+
+
 def read_questionnaire(
     path: Path,
     config: FormatConfig,
     column_definitions: list | None = None,
+    heading_pattern: str = "",
 ) -> list[Question]:
     if config.file_format == "docx":
-        return _read_docx_questionnaire(path, config, column_definitions)
-    return _read_xlsx_questionnaire(path, config, column_definitions)
+        return _read_docx_questionnaire(path, config, column_definitions, heading_pattern)
+    return _read_xlsx_questionnaire(path, config, column_definitions, heading_pattern)
 
 
 def _read_xlsx_questionnaire(
     path: Path,
     config: FormatConfig,
     column_definitions: list | None = None,
+    heading_pattern: str = "",
 ) -> list[Question]:
     from openpyxl import load_workbook
 
@@ -146,11 +178,14 @@ def _read_xlsx_questionnaire(
 
     # 読み取り列（question以外）のインデックスマップ
     extra_col_map: list[tuple[int, dict]] = []
+    number_col_idx = -1
     if column_definitions:
         for d in column_definitions:
             if d.get("role") in _ROLES_READ and d.get("role") != "question":
                 idx = _col_letter_to_index(d["col"])
                 extra_col_map.append((idx, d))
+            if d.get("role") == "number":
+                number_col_idx = _col_letter_to_index(d["col"])
 
     questions = []
     for i, row in enumerate(ws.iter_rows(min_row=config.data_start_row, values_only=True), start=1):
@@ -174,7 +209,7 @@ def _read_xlsx_questionnaire(
                     "value": val,
                 }
 
-        questions.append(Question(
+        q = Question(
             question_no=i,
             question_text=q_text,
             major=major,
@@ -182,7 +217,10 @@ def _read_xlsx_questionnaire(
             choices_text=choices,
             remarks_text=remarks,
             extra_columns=extra,
-        ))
+        )
+        if heading_pattern:
+            q.is_heading = _detect_heading(q, heading_pattern, number_col_idx, row)
+        questions.append(q)
 
     wb.close()
     return questions
@@ -192,6 +230,7 @@ def _read_docx_questionnaire(
     path: Path,
     config: FormatConfig,
     column_definitions: list | None = None,
+    heading_pattern: str = "",
 ) -> list[Question]:
     from docx import Document
 
@@ -205,11 +244,14 @@ def _read_docx_questionnaire(
     r_idx = _col_letter_to_index(config.remarks_col) if config.remarks_col else -1
 
     extra_col_map: list[tuple[int, dict]] = []
+    number_col_idx = -1
     if column_definitions:
         for d in column_definitions:
             if d.get("role") in _ROLES_READ and d.get("role") != "question":
                 idx = _col_letter_to_index(d["col"])
                 extra_col_map.append((idx, d))
+            if d.get("role") == "number":
+                number_col_idx = _col_letter_to_index(d["col"])
 
     questions = []
     no = 0
@@ -238,7 +280,8 @@ def _read_docx_questionnaire(
                     "value": val,
                 }
 
-        questions.append(Question(
+        row_vals = tuple(c.text.strip() for c in cells)
+        q = Question(
             question_no=no,
             question_text=q_text,
             major=major,
@@ -246,7 +289,10 @@ def _read_docx_questionnaire(
             choices_text=choices,
             remarks_text=remarks,
             extra_columns=extra,
-        ))
+        )
+        if heading_pattern:
+            q.is_heading = _detect_heading(q, heading_pattern, number_col_idx, row_vals)
+        questions.append(q)
 
     return questions
 
