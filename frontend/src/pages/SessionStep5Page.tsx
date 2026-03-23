@@ -1,15 +1,10 @@
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "react-router-dom"
-import { Download, Check, ChevronDown } from "lucide-react"
+import { Download, Check } from "lucide-react"
 import { apiFetch, getApiBaseUrl } from "@/lib/httpClient"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StepIndicator } from "@/components/StepIndicator"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
 
 type SessionQuestion = {
   question_no: number
@@ -188,12 +183,14 @@ export default function SessionStep5Page() {
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <span className="font-mono text-muted-foreground">#{q.question_no}</span>
                   <span className={`text-xs px-2 py-0.5 rounded ${src.color}`}>{src.label}</span>
-                  {q.assessment_mark && (
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                      q.assessment_mark === "\u25CB" ? "bg-green-100 text-green-700" :
-                      q.assessment_mark === "\u25B3" ? "bg-yellow-100 text-yellow-700" :
-                      "bg-red-100 text-red-700"
-                    }`}>{q.assessment_mark}</span>
+                  {q.confidence && q.confidence !== "low" && (
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      q.confidence === "high" ? "bg-emerald-100 text-emerald-700" :
+                      q.confidence === "medium" ? "bg-amber-100 text-amber-700" :
+                      "bg-gray-100 text-gray-500"
+                    }`}>
+                      AI確信度: {q.confidence === "high" ? "高" : q.confidence === "medium" ? "中" : "低"}
+                    </span>
                   )}
                 </CardTitle>
               </CardHeader>
@@ -286,21 +283,16 @@ export default function SessionStep5Page() {
                   </>
                 )}
 
-                {/* AI proposal (collapsible) */}
-                <Collapsible>
-                  <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer border-t pt-2 w-full">
-                    <ChevronDown className="h-3 w-3" />
-                    AIからの提案
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-2">
-                    <p className="text-xs text-muted-foreground mb-2 italic">{message}</p>
-                    {q.answer_text ? (
-                      <p className="text-sm whitespace-pre-wrap text-muted-foreground">{q.answer_text}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">提案なし</p>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
+                {/* AI proposal */}
+                <div className="border-t pt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">AIからの提案</p>
+                  <p className="text-xs text-muted-foreground mb-2 italic">{message}</p>
+                  {q.answer_text ? (
+                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">{q.answer_text}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">提案なし</p>
+                  )}
+                </div>
 
               </CardContent>
             </Card>
