@@ -142,9 +142,9 @@ def extract_preview(
     file_path: Path,
     file_format: str,
     sheet_name: Optional[str] = None,
-    table_index: int = 0,
+    table_index: int = -1,
 ) -> Dict[str, Any]:
-    """ファイルの先頭N行をプレビュー用に抽出する."""
+    """ファイルの先頭N行をプレビュー用に抽出する. table_index=-1 で自動選択."""
     if file_format == "docx":
         return _extract_docx_preview(file_path, table_index)
     return _extract_xlsx_preview(file_path, sheet_name)
@@ -195,7 +195,7 @@ def _extract_xlsx_preview(
 
 def _extract_docx_preview(
     file_path: Path,
-    table_index: int = 0,
+    table_index: int = -1,
 ) -> Dict[str, Any]:
     from docx import Document
 
@@ -208,21 +208,45 @@ def _extract_docx_preview(
             "total_rows": 0,
             "sheet_names": [],
             "table_count": 0,
+            "tables_summary": [],
+            "best_table_index": 0,
         }
 
-    tbl = doc.tables[min(table_index, table_count - 1)]
+    # 全テーブルのサマリを作成
+    tables_summary: List[Dict[str, Any]] = []
+    best_idx = 0
+    best_size = 0
+    for i, t in enumerate(doc.tables):
+        t_rows = len(t.rows)
+        t_cols = max((len(r.cells) for r in t.rows), default=0)
+        header = ""
+        if t.rows:
+            header_cells = [c.text.strip()[:30] for c in t.rows[0].cells[:5]]
+            header = " | ".join(header_cells)
+        tables_summary.append({
+            "index": i,
+            "rows": t_rows,
+            "cols": t_cols,
+            "header": header,
+        })
+        size = t_rows * t_cols
+        if size > best_size:
+            best_size = size
+            best_idx = i
+
+    # table_index=-1 の場合は自動選択
+    selected_idx = best_idx if table_index < 0 else min(table_index, table_count - 1)
+
+    tbl = doc.tables[selected_idx]
     max_col = max((len(r.cells) for r in tbl.rows), default=0)
-    # docxでも内部的にはA/B/C列記号を使う（FormatConfigとの互換性）
     col_letters = [_index_to_col_letter(i) for i in range(max_col)]
 
     rows: List[Dict[str, Any]] = []
     for row_idx, row in enumerate(tbl.rows[:_MAX_PREVIEW_ROWS], start=1):
         cells = [cell.text.strip() for cell in row.cells]
-        # パディング
         cells.extend([""] * (max_col - len(cells)))
         rows.append({"row_num": row_idx, "cells": cells})
 
-    # ヘッダー行テキスト（1行目）を抽出
     header_texts: List[str] = []
     if tbl.rows:
         first_row = tbl.rows[0]
@@ -235,6 +259,9 @@ def _extract_docx_preview(
         "total_rows": len(tbl.rows),
         "sheet_names": [],
         "table_count": table_count,
+        "tables_summary": tables_summary,
+        "best_table_index": best_idx,
+        "selected_table_index": selected_idx,
         "header_texts": header_texts,
     }
 

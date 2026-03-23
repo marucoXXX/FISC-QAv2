@@ -18,6 +18,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 
+type TableSummary = {
+  index: number
+  rows: number
+  cols: number
+  header: string
+}
+
 type Preview = {
   col_letters: string[]
   rows: { row_num: number; cells: string[] }[]
@@ -25,6 +32,9 @@ type Preview = {
   sheet_names: string[]
   table_count: number
   header_texts?: string[]
+  tables_summary?: TableSummary[]
+  best_table_index?: number
+  selected_table_index?: number
 }
 
 type Confidence = Record<string, "high" | "medium" | "low">
@@ -90,7 +100,9 @@ export default function FormatAnalyzePage() {
   // Mapping state (editable)
   const [mapping, setMapping] = useState<Suggestion | null>(null)
 
-  // Word hints
+  // Word: table selection + hints
+  const [selectedTableIndex, setSelectedTableIndex] = useState(0)
+  const [reanalyzing, setReanalyzing] = useState(false)
   const [userHint, setUserHint] = useState("")
 
   // Confirm
@@ -132,11 +144,39 @@ export default function FormatAnalyzePage() {
       setFileName(data.file_name)
       setMapping(data.suggestion)
       setQaFileName(data.file_name.replace(/\.[^.]+$/, ""))
+      setSelectedTableIndex(data.preview.selected_table_index ?? data.preview.best_table_index ?? 0)
       setStep("basic")
     } finally {
       setAnalyzing(false)
     }
   }, [file, bankId])
+
+  const handleTableChange = useCallback(async (newIndex: number) => {
+    if (!tempFileId || !bankId) return
+    setSelectedTableIndex(newIndex)
+    setReanalyzing(true)
+    setError("")
+
+    try {
+      const res = await apiFetch(`/api/banks/${bankId}/qa-files/analyze/reparse`, {
+        method: "POST",
+        body: JSON.stringify({
+          temp_file_id: tempFileId,
+          file_format: fileFormat,
+          table_index: newIndex,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.detail || "テーブル切替に失敗しました")
+        return
+      }
+      setPreview(data.preview)
+      setMapping(data.suggestion)
+    } finally {
+      setReanalyzing(false)
+    }
+  }, [tempFileId, bankId, fileFormat])
 
   const handleNextToColumns = useCallback(async () => {
     if (!mapping || !tempFileId || !bankId) return
@@ -149,6 +189,7 @@ export default function FormatAnalyzePage() {
         body: JSON.stringify({
           temp_file_id: tempFileId,
           file_format: fileFormat,
+          table_index: selectedTableIndex,
           header_row: mapping.header_row,
           data_start_row: mapping.data_start_row,
           format_type: mapping.format_type,
@@ -191,7 +232,7 @@ export default function FormatAnalyzePage() {
     } finally {
       setAnalyzingColumns(false)
     }
-  }, [mapping, tempFileId, fileFormat, bankId, userHint])
+  }, [mapping, tempFileId, fileFormat, bankId, userHint, selectedTableIndex])
 
   const handleConfirm = useCallback(async () => {
     if (!mapping || !bankId || !qaFileName) return
@@ -370,6 +411,32 @@ export default function FormatAnalyzePage() {
                 <Badge variant="outline">{fileFormat.toUpperCase()}</Badge>
               </div>
 
+              {/* Word: table selector */}
+              {isDocx && preview.tables_summary && preview.tables_summary.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label className="text-sm">対象テーブル</Label>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={selectedTableIndex}
+                    onChange={(e) => handleTableChange(parseInt(e.target.value))}
+                    disabled={reanalyzing}
+                  >
+                    {preview.tables_summary.map((t) => (
+                      <option key={t.index} value={t.index}>
+                        テーブル{t.index + 1}: {t.rows}行×{t.cols}列 — {t.header.slice(0, 40)}{t.header.length > 40 ? "..." : ""}
+                        {t.index === (preview.best_table_index ?? 0) ? " (自動選択)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {reanalyzing && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      テーブルを再分析中...
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <MappingFieldNumber
                   label="ヘッダー行"
@@ -399,15 +466,6 @@ export default function FormatAnalyzePage() {
                   onChange={(v) => updateMapping("format_type", v)}
                 />
 
-                {/* Word: table selector */}
-                {isDocx && preview.table_count > 1 && (
-                  <MappingFieldNumber
-                    label="テーブル番号"
-                    field="table_index"
-                    value={1}
-                    onChange={() => {}}
-                  />
-                )}
               </div>
 
               {/* Word: user hint */}

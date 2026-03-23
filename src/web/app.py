@@ -246,6 +246,25 @@ def create_router(
             "file_format": file_format,
         }
 
+    @router.post("/api/banks/{bank_id}/qa-files/analyze/reparse")
+    def analyze_reparse(bank_id: int, req: dict) -> dict:
+        """テーブル切替時: 指定table_indexでプレビュー再抽出 + 1次分析."""
+        temp_file_id = req.get("temp_file_id", "")
+        temp_dir = UPLOAD_DIR / temp_file_id
+        if not temp_dir.exists():
+            raise HTTPException(404, "一時ファイルが見つかりません")
+        files = list(temp_dir.iterdir())
+        if not files:
+            raise HTTPException(404, "一時ファイルが見つかりません")
+
+        from ..format_analyzer import extract_preview, analyze_format
+
+        file_format = req.get("file_format", "xlsx")
+        table_index = req.get("table_index", 0)
+        preview = extract_preview(files[0], file_format, table_index=table_index)
+        suggestion = analyze_format(preview, config.model, config.api_key)
+        return {"preview": preview, "suggestion": suggestion}
+
     @router.post("/api/banks/{bank_id}/qa-files/analyze/preview")
     def analyze_preview(bank_id: int, req: dict) -> dict:
         temp_file_id = req.get("temp_file_id", "")
