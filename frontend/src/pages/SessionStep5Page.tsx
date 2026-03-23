@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "react-router-dom"
-import { Download, Check } from "lucide-react"
+import { Download, Check, ChevronDown } from "lucide-react"
 import { apiFetch, getApiBaseUrl } from "@/lib/httpClient"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StepIndicator } from "@/components/StepIndicator"
-import { ExtraColumnsDisplay } from "@/components/ExtraColumnsDisplay"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
 type SessionQuestion = {
   question_no: number
@@ -21,6 +25,18 @@ type SessionQuestion = {
   extra_columns?: string
 }
 
+type ColumnDef = {
+  col: string
+  role: string
+  description: string
+}
+
+type ExtraCol = {
+  role: string
+  description: string
+  value: string
+}
+
 type Stats = {
   total: number
   past_match: number
@@ -29,6 +45,8 @@ type Stats = {
   manual: number
   pending: number
 }
+
+const ROLES_READ = new Set(["question", "category", "number", "reference", "remarks"])
 
 const sourceLabels: Record<string, { label: string; color: string }> = {
   past_match: { label: "過去回答", color: "bg-blue-100 text-blue-700" },
@@ -42,23 +60,26 @@ function proposalMessage(q: SessionQuestion): string {
   if (!q.answer_text) {
     return "過去回答・共通回答・設計/運用ドキュメントからは回答が見つかりませんでした。手動での回答入力をお願いします。"
   }
-  const refs = q.source_references.length > 0
-    ? q.source_references.join(", ")
-    : ""
+  const refs = q.source_references.length > 0 ? q.source_references.join(", ") : ""
   switch (q.answer_source) {
-    case "past_match":
-      return "過去回答を参照してAIからの意見です。"
-    case "common_match":
-      return "共通回答DBを参照してAIからの意見です。"
-    case "generated":
-      return refs
-        ? `設計/運用ドキュメント（${refs}）を参照してAIからの意見です。`
-        : "設計/運用ドキュメントを参照してAIからの意見です。"
-    case "manual":
-      return "手動で入力された回答です。"
-    default:
-      return ""
+    case "past_match": return "過去回答を参照してAIからの意見です。"
+    case "common_match": return "共通回答DBを参照してAIからの意見です。"
+    case "generated": return refs
+      ? `設計/運用ドキュメント（${refs}）を参照してAIからの意見です。`
+      : "設計/運用ドキュメントを参照してAIからの意見です。"
+    case "manual": return "手動で入力された回答です。"
+    default: return ""
   }
+}
+
+function parseColDefs(raw?: string): ColumnDef[] {
+  if (!raw || raw === "[]") return []
+  try { return JSON.parse(raw) } catch { return [] }
+}
+
+function parseExtraCols(raw?: string): Record<string, ExtraCol> {
+  if (!raw || raw === "{}") return {}
+  try { return JSON.parse(raw) } catch { return {} }
 }
 
 export default function SessionStep5Page() {
@@ -69,6 +90,7 @@ export default function SessionStep5Page() {
   const [drafts, setDrafts] = useState<Record<number, string>>({})
   const [savedDrafts, setSavedDrafts] = useState<Record<number, string>>({})
   const [saving, setSaving] = useState<Record<number, boolean>>({})
+  const [colDefs, setColDefs] = useState<ColumnDef[]>([])
 
   const load = useCallback(async () => {
     const res = await apiFetch(`/api/sessions/${sessionId}/step5/summary`)
@@ -76,6 +98,7 @@ export default function SessionStep5Page() {
       const data = await res.json()
       setQuestions(data.questions)
       setStats(data.stats)
+      setColDefs(parseColDefs(data.session?.column_definitions))
       const initDrafts: Record<number, string> = {}
       for (const q of data.questions as SessionQuestion[]) {
         const confident = q.answer_source !== "pending" && q.confidence !== "low"
@@ -117,6 +140,12 @@ export default function SessionStep5Page() {
     window.open(`${getApiBaseUrl()}/api/sessions/${sessionId}/export`, "_blank")
   }
 
+  // Format-aware column groups
+  const hasColDefs = colDefs.length > 0
+  const questionCol = colDefs.find((d) => d.role === "question")
+  const readCols = colDefs.filter((d) => ROLES_READ.has(d.role) && d.role !== "question")
+  const writeCols = colDefs.filter((d) => d.role === "answer" || d.role === "judgment")
+
   return (
     <div className="space-y-4">
       <StepIndicator current={5} />
@@ -151,72 +180,139 @@ export default function SessionStep5Page() {
         {questions.map((q) => {
           const src = sourceLabels[q.answer_source] || sourceLabels.pending
           const message = proposalMessage(q)
+          const extras = parseExtraCols(q.extra_columns)
+
           return (
             <Card key={q.question_no} className="py-4 gap-3">
               <CardHeader className="py-0">
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <span className="font-mono text-muted-foreground">#{q.question_no}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${src.color}`}>
-                    {src.label}
-                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded ${src.color}`}>{src.label}</span>
                   {q.assessment_mark && (
                     <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                       q.assessment_mark === "\u25CB" ? "bg-green-100 text-green-700" :
                       q.assessment_mark === "\u25B3" ? "bg-yellow-100 text-yellow-700" :
                       "bg-red-100 text-red-700"
-                    }`}>
-                      {q.assessment_mark}
-                    </span>
+                    }`}>{q.assessment_mark}</span>
                   )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 py-0">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">質問</p>
-                  <p className="text-sm whitespace-pre-wrap">{q.question_text}</p>
-                  <ExtraColumnsDisplay extraColumnsRaw={q.extra_columns} />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">回答案</p>
-                  <div className="flex gap-2 items-start">
-                    <textarea
-                      className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px] resize-y"
-                      value={drafts[q.question_no] ?? ""}
-                      onChange={(e) => setDrafts((prev) => ({ ...prev, [q.question_no]: e.target.value }))}
-                      placeholder="回答を入力してください"
-                    />
-                    {(() => {
-                      const isSaving = saving[q.question_no]
-                      const isChanged = (drafts[q.question_no] ?? "") !== (savedDrafts[q.question_no] ?? "")
-                      if (isSaving) {
-                        return <Button variant="outline" size="sm" className="shrink-0" disabled>保存中...</Button>
-                      }
-                      if (!isChanged) {
-                        return <Button variant="outline" size="sm" className="shrink-0 text-muted-foreground" disabled>保存済み</Button>
-                      }
+
+                {hasColDefs ? (
+                  <>
+                    {/* Format-aware: question column */}
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">
+                        {questionCol?.description || "質問"}
+                      </p>
+                      <p className="text-sm whitespace-pre-wrap">{q.question_text}</p>
+                    </div>
+
+                    {/* Format-aware: read columns */}
+                    {readCols.map((cd) => {
+                      const extra = extras[cd.col]
+                      if (!extra?.value) return null
                       return (
-                        <Button variant="default" size="sm" className="shrink-0" onClick={() => saveDraft(q.question_no)}>
-                          保存
-                        </Button>
+                        <div key={cd.col}>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">{cd.description}</p>
+                          <p className="text-sm whitespace-pre-wrap">{extra.value}</p>
+                        </div>
                       )
-                    })()}
-                  </div>
-                </div>
-                <div className="border-t pt-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">AIからの提案</p>
-                  <p className="text-xs text-muted-foreground mb-2 italic">{message}</p>
-                  {q.answer_text ? (
-                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">{q.answer_text}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">提案なし</p>
-                  )}
-                </div>
+                    })}
+
+                    {/* Format-aware: write columns */}
+                    {writeCols.map((cd) => (
+                      <div key={cd.col} className="border-t pt-2">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          {cd.description}
+                          {cd.role === "judgment" && <span className="text-[10px] ml-1">(判定)</span>}
+                          {cd.role === "answer" && <span className="text-[10px] ml-1">(回答)</span>}
+                        </p>
+                        {cd.role === "judgment" ? (
+                          <select
+                            className="h-8 rounded border border-input bg-transparent px-2 text-sm"
+                            value={q.assessment_mark || ""}
+                            onChange={(e) => {
+                              // TODO: save assessment_mark via API
+                            }}
+                          >
+                            <option value="">未選択</option>
+                            <option value="○">○</option>
+                            <option value="△">△</option>
+                            <option value="×">×</option>
+                          </select>
+                        ) : (
+                          <div className="flex gap-2 items-start">
+                            <textarea
+                              className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px] resize-y"
+                              value={drafts[q.question_no] ?? ""}
+                              onChange={(e) => setDrafts((prev) => ({ ...prev, [q.question_no]: e.target.value }))}
+                              placeholder="回答を入力してください"
+                            />
+                            <SaveButton
+                              isSaving={!!saving[q.question_no]}
+                              isChanged={(drafts[q.question_no] ?? "") !== (savedDrafts[q.question_no] ?? "")}
+                              onSave={() => saveDraft(q.question_no)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {/* Legacy fallback */}
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">質問</p>
+                      <p className="text-sm whitespace-pre-wrap">{q.question_text}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">回答案</p>
+                      <div className="flex gap-2 items-start">
+                        <textarea
+                          className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px] resize-y"
+                          value={drafts[q.question_no] ?? ""}
+                          onChange={(e) => setDrafts((prev) => ({ ...prev, [q.question_no]: e.target.value }))}
+                          placeholder="回答を入力してください"
+                        />
+                        <SaveButton
+                          isSaving={!!saving[q.question_no]}
+                          isChanged={(drafts[q.question_no] ?? "") !== (savedDrafts[q.question_no] ?? "")}
+                          onSave={() => saveDraft(q.question_no)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* AI proposal (collapsible) */}
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer border-t pt-2 w-full">
+                    <ChevronDown className="h-3 w-3" />
+                    AIからの提案
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2">
+                    <p className="text-xs text-muted-foreground mb-2 italic">{message}</p>
+                    {q.answer_text ? (
+                      <p className="text-sm whitespace-pre-wrap text-muted-foreground">{q.answer_text}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">提案なし</p>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+
               </CardContent>
             </Card>
           )
         })}
       </div>
-
     </div>
   )
+}
+
+function SaveButton({ isSaving, isChanged, onSave }: { isSaving: boolean; isChanged: boolean; onSave: () => void }) {
+  if (isSaving) return <Button variant="outline" size="sm" className="shrink-0" disabled>保存中...</Button>
+  if (!isChanged) return <Button variant="outline" size="sm" className="shrink-0 text-muted-foreground" disabled>保存済み</Button>
+  return <Button variant="default" size="sm" className="shrink-0" onClick={onSave}>保存</Button>
 }
