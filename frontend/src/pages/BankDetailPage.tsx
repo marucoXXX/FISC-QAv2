@@ -35,6 +35,12 @@ type Bank = {
   notes: string
 }
 
+type ColumnDef = {
+  col: string
+  role: string
+  description: string
+}
+
 type QaFile = {
   id: number
   bank_id: number
@@ -48,12 +54,35 @@ type QaFile = {
   format_type: string
   choices_col: string
   remarks_col: string
+  column_definitions?: string
+  row_structure?: string
 }
 
-const FORMAT_TYPE_LABELS: Record<string, string> = {
-  choices: "選択肢＋備考型",
-  assessment: "○/△/× 判定型",
-  freetext: "自由記述型",
+const ROLE_LABELS: Record<string, string> = {
+  question: "質問",
+  answer: "回答",
+  category: "分類",
+  number: "番号",
+  reference: "参照",
+  remarks: "備考",
+  judgment: "判定",
+  other: "他",
+}
+
+function formatColumnDefsSummary(qf: QaFile): string {
+  if (!qf.column_definitions || qf.column_definitions === "[]") {
+    // 旧式フォールバック
+    const parts = [`質問:${qf.question_col}`, `回答:${qf.answer_col}`]
+    if (qf.choices_col) parts.push(`判定:${qf.choices_col}`)
+    if (qf.remarks_col) parts.push(`備考:${qf.remarks_col}`)
+    return parts.join(", ")
+  }
+  try {
+    const defs: ColumnDef[] = JSON.parse(qf.column_definitions)
+    return defs.map((d) => `${ROLE_LABELS[d.role] || d.role}:${d.col}`).join(", ")
+  } catch {
+    return `質問:${qf.question_col}, 回答:${qf.answer_col}`
+  }
 }
 
 type PastQA = {
@@ -242,12 +271,10 @@ export default function BankDetailPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>QAファイル名</TableHead>
-                  <TableHead>類型</TableHead>
                   <TableHead>形式</TableHead>
-                  <TableHead>質問列</TableHead>
-                  <TableHead>回答列</TableHead>
                   <TableHead>ヘッダー行</TableHead>
                   <TableHead>データ開始行</TableHead>
+                  <TableHead>列定義</TableHead>
                   <TableHead className="w-20"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -255,12 +282,12 @@ export default function BankDetailPage() {
                 {qaFiles.map((qf) => (
                   <TableRow key={qf.id}>
                     <TableCell className="font-medium">{qf.qa_file_name}</TableCell>
-                    <TableCell className="text-xs">{FORMAT_TYPE_LABELS[qf.format_type] || qf.format_type}</TableCell>
                     <TableCell>{qf.file_format.toUpperCase()}</TableCell>
-                    <TableCell>{qf.question_col}</TableCell>
-                    <TableCell>{qf.answer_col}</TableCell>
                     <TableCell>{qf.header_row}</TableCell>
                     <TableCell>{qf.data_start_row}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[300px] truncate" title={formatColumnDefsSummary(qf)}>
+                      {formatColumnDefsSummary(qf)}
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => openEditQf(qf)}>
