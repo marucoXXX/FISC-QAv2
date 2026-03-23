@@ -324,7 +324,6 @@ def create_router(
             preview,
             header_row=req.get("header_row", 1),
             data_start_row=req.get("data_start_row", 2),
-            format_type=req.get("format_type", "freetext"),
             model=config.model,
             api_key=config.api_key,
             user_hint=req.get("user_hint", ""),
@@ -341,19 +340,35 @@ def create_router(
         if not qa_file_name:
             raise HTTPException(400, "QAファイル名を指定してください")
 
+        # column_definitions から旧カラム（question_col等）を導出
+        col_defs = req.get("column_definitions", [])
+        row_structure = req.get("row_structure", "")
+        col_defs_json = json.dumps(col_defs, ensure_ascii=False) if isinstance(col_defs, list) else str(col_defs)
+
+        from ..file_io import derive_format_config
+        fc = derive_format_config(
+            col_defs,
+            header_row=req.get("header_row", 1),
+            data_start_row=req.get("data_start_row", 2),
+            file_format=req.get("file_format", "xlsx"),
+            table_index=req.get("table_index", 0),
+        )
+
         try:
             qa_file_id = db.create_bank_qa_file(
                 db_path, bank_id, qa_file_name,
-                file_format=req.get("file_format", "xlsx"),
-                question_col=req.get("question_col", "D"),
-                answer_col=req.get("answer_col", "E"),
-                header_row=req.get("header_row", 1),
-                data_start_row=req.get("data_start_row", 2),
-                table_index=req.get("table_index", 0),
-                format_type=req.get("format_type", "freetext"),
-                choices_col=req.get("choices_col", ""),
-                remarks_col=req.get("remarks_col", ""),
+                file_format=fc.file_format,
+                question_col=fc.question_col,
+                answer_col=fc.answer_col,
+                header_row=fc.header_row,
+                data_start_row=fc.data_start_row,
+                table_index=fc.table_index,
+                format_type=fc.format_type,
+                choices_col=fc.choices_col,
+                remarks_col=fc.remarks_col,
                 analysis_confirmed=1,
+                column_definitions=col_defs_json,
+                row_structure=row_structure,
             )
         except Exception as e:
             if "UNIQUE" in str(e):

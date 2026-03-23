@@ -182,6 +182,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         ("session_questions", "match_reason", "TEXT NOT NULL DEFAULT ''"),
         ("session_questions", "assessment_mark", "TEXT NOT NULL DEFAULT ''"),
         ("bank_qa_files", "analysis_confirmed", "INTEGER NOT NULL DEFAULT 0"),
+        ("bank_qa_files", "column_definitions", "TEXT NOT NULL DEFAULT '[]'"),
+        ("bank_qa_files", "row_structure", "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, col_def in migrations:
         try:
@@ -465,6 +467,8 @@ def create_bank_qa_file(
     choices_col: str = "",
     remarks_col: str = "",
     analysis_confirmed: int = 0,
+    column_definitions: str = "[]",
+    row_structure: str = "",
 ) -> int:
     now = datetime.now().isoformat()
     with get_conn(db_path) as conn:
@@ -472,11 +476,13 @@ def create_bank_qa_file(
             "INSERT INTO bank_qa_files (bank_id, qa_file_name, file_format, "
             "question_col, answer_col, header_row, data_start_row, table_index, "
             "format_type, choices_col, remarks_col, analysis_confirmed, "
+            "column_definitions, row_structure, "
             "created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (bank_id, qa_file_name, file_format, question_col, answer_col,
              header_row, data_start_row, table_index,
-             format_type, choices_col, remarks_col, analysis_confirmed, now, now),
+             format_type, choices_col, remarks_col, analysis_confirmed,
+             column_definitions, row_structure, now, now),
         )
         return cur.lastrowid
 

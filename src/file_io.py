@@ -21,6 +21,41 @@ class FormatConfig:
     remarks_col: str = ""
 
 
+def derive_format_config(
+    column_definitions: list,
+    header_row: int,
+    data_start_row: int,
+    file_format: str = "xlsx",
+    table_index: int = 0,
+) -> FormatConfig:
+    """column_definitions から FormatConfig を導出する."""
+    def _find_col(role: str) -> str:
+        return next((d["col"] for d in column_definitions if d.get("role") == role), "")
+
+    q_col = _find_col("question") or "D"
+    a_col = _find_col("answer") or "E"
+    c_col = _find_col("judgment")
+    r_col = _find_col("remarks")
+
+    # format_type を判定列の有無から導出
+    if c_col:
+        fmt = "assessment"
+    else:
+        fmt = "freetext"
+
+    return FormatConfig(
+        file_format=file_format,
+        question_col=q_col,
+        answer_col=a_col,
+        header_row=header_row,
+        data_start_row=data_start_row,
+        table_index=table_index,
+        format_type=fmt,
+        choices_col=c_col,
+        remarks_col=r_col,
+    )
+
+
 @dataclass
 class Question:
     question_no: int

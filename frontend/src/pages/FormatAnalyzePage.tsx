@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
-import { ArrowLeft, Upload, ChevronDown, ChevronRight, Check, Loader2 } from "lucide-react"
+import { ArrowLeft, Upload, ChevronRight, Check, Loader2, Plus, Trash2 } from "lucide-react"
 import { apiFetch } from "@/lib/httpClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,11 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
 
 type TableSummary = {
   index: number
@@ -37,28 +32,54 @@ type Preview = {
   selected_table_index?: number
 }
 
-type Confidence = Record<string, "high" | "medium" | "low">
+type Confidence = Record<string, string>
 type Reasoning = Record<string, string>
 
-type Suggestion = {
-  question_col: string
-  answer_col: string
+type BasicSuggestion = {
   header_row: number
   data_start_row: number
-  format_type: string
-  choices_col: string
-  remarks_col: string
   confidence: Confidence
   reasoning: Reasoning
 }
 
+type ColumnDef = {
+  col: string
+  role: string
+  description: string
+}
+
 type Step = "upload" | "basic" | "columns"
 
-const FORMAT_TYPE_OPTIONS = [
-  { value: "freetext", label: "自由記述型" },
-  { value: "choices", label: "選択肢＋備考型" },
-  { value: "assessment", label: "○/△/× 判定型" },
+const ROLE_OPTIONS = [
+  { value: "question", label: "質問・確認事項" },
+  { value: "answer", label: "回答欄" },
+  { value: "category", label: "分類・カテゴリ" },
+  { value: "remarks", label: "備考" },
+  { value: "number", label: "番号" },
+  { value: "reference", label: "参照・エビデンス" },
+  { value: "judgment", label: "判定（○/△/×等）" },
+  { value: "other", label: "その他" },
 ]
+
+const ROLE_COLORS: Record<string, string> = {
+  question: "bg-green-50 border-green-200",
+  answer: "bg-orange-50 border-orange-200",
+  category: "bg-blue-50 border-blue-200",
+  remarks: "bg-gray-50 border-gray-200",
+  number: "bg-slate-50 border-slate-200",
+  reference: "bg-violet-50 border-violet-200",
+  judgment: "bg-amber-50 border-amber-200",
+  other: "bg-neutral-50 border-neutral-200",
+}
+
+const COL_HIGHLIGHT_BY_ROLE: Record<string, string> = {
+  question: "bg-green-50",
+  answer: "bg-orange-50",
+  category: "bg-blue-50",
+  remarks: "bg-gray-100",
+  judgment: "bg-amber-50",
+  reference: "bg-violet-50",
+}
 
 const CONFIDENCE_COLORS: Record<string, string> = {
   high: "bg-green-100 text-green-800 border-green-300",
@@ -70,13 +91,6 @@ const CONFIDENCE_LABELS: Record<string, string> = {
   high: "高",
   medium: "中",
   low: "低",
-}
-
-const COL_HIGHLIGHT: Record<string, string> = {
-  question_col: "bg-green-50",
-  answer_col: "bg-orange-50",
-  choices_col: "bg-purple-50",
-  remarks_col: "bg-gray-100",
 }
 
 export default function FormatAnalyzePage() {
@@ -91,31 +105,32 @@ export default function FormatAnalyzePage() {
   const [analyzingColumns, setAnalyzingColumns] = useState(false)
   const [error, setError] = useState("")
 
-  // Analysis result state
   const [preview, setPreview] = useState<Preview | null>(null)
   const [tempFileId, setTempFileId] = useState("")
   const [fileFormat, setFileFormat] = useState("xlsx")
   const [fileName, setFileName] = useState("")
 
-  // Mapping state (editable)
-  const [mapping, setMapping] = useState<Suggestion | null>(null)
+  // Basic settings (Step A)
+  const [basicSuggestion, setBasicSuggestion] = useState<BasicSuggestion | null>(null)
+  const [headerRow, setHeaderRow] = useState(1)
+  const [dataStartRow, setDataStartRow] = useState(2)
 
-  // Word: table selection + hints
+  // Column definitions (Step B)
+  const [columnDefs, setColumnDefs] = useState<ColumnDef[]>([])
+  const [rowStructure, setRowStructure] = useState("")
+
+  // Word
   const [selectedTableIndex, setSelectedTableIndex] = useState(0)
   const [reanalyzing, setReanalyzing] = useState(false)
   const [userHint, setUserHint] = useState("")
 
-  // Confirm
   const [qaFileName, setQaFileName] = useState("")
   const [confirming, setConfirming] = useState(false)
 
   useEffect(() => {
     if (!bankId) return
     apiFetch(`/api/banks/${bankId}`).then(async (res) => {
-      if (res.ok) {
-        const data = await res.json()
-        setBankName(data.name)
-      }
+      if (res.ok) setBankName((await res.json()).name)
     })
   }, [bankId])
 
@@ -133,18 +148,22 @@ export default function FormatAnalyzePage() {
         body: formData,
       })
       const data = await res.json()
-      if (!res.ok) {
-        setError(data.detail || "分析に失敗しました")
-        return
-      }
+      if (!res.ok) { setError(data.detail || "分析に失敗しました"); return }
 
       setPreview(data.preview)
       setTempFileId(data.temp_file_id)
       setFileFormat(data.file_format)
       setFileName(data.file_name)
-      setMapping(data.suggestion)
-      setQaFileName(data.file_name.replace(/\.[^.]+$/, ""))
+      setHeaderRow(data.suggestion.header_row)
+      setDataStartRow(data.suggestion.data_start_row)
+      setBasicSuggestion({
+        header_row: data.suggestion.header_row,
+        data_start_row: data.suggestion.data_start_row,
+        confidence: data.suggestion.confidence || {},
+        reasoning: data.suggestion.reasoning || {},
+      })
       setSelectedTableIndex(data.preview.selected_table_index ?? data.preview.best_table_index ?? 0)
+      setQaFileName(data.file_name.replace(/\.[^.]+$/, ""))
       setStep("basic")
     } finally {
       setAnalyzing(false)
@@ -160,26 +179,26 @@ export default function FormatAnalyzePage() {
     try {
       const res = await apiFetch(`/api/banks/${bankId}/qa-files/analyze/reparse`, {
         method: "POST",
-        body: JSON.stringify({
-          temp_file_id: tempFileId,
-          file_format: fileFormat,
-          table_index: newIndex,
-        }),
+        body: JSON.stringify({ temp_file_id: tempFileId, file_format: fileFormat, table_index: newIndex }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        setError(data.detail || "テーブル切替に失敗しました")
-        return
-      }
+      if (!res.ok) { setError(data.detail || "テーブル切替に失敗しました"); return }
       setPreview(data.preview)
-      setMapping(data.suggestion)
+      setHeaderRow(data.suggestion.header_row)
+      setDataStartRow(data.suggestion.data_start_row)
+      setBasicSuggestion({
+        header_row: data.suggestion.header_row,
+        data_start_row: data.suggestion.data_start_row,
+        confidence: data.suggestion.confidence || {},
+        reasoning: data.suggestion.reasoning || {},
+      })
     } finally {
       setReanalyzing(false)
     }
   }, [tempFileId, bankId, fileFormat])
 
   const handleNextToColumns = useCallback(async () => {
-    if (!mapping || !tempFileId || !bankId) return
+    if (!tempFileId || !bankId) return
     setAnalyzingColumns(true)
     setError("")
 
@@ -190,52 +209,23 @@ export default function FormatAnalyzePage() {
           temp_file_id: tempFileId,
           file_format: fileFormat,
           table_index: selectedTableIndex,
-          header_row: mapping.header_row,
-          data_start_row: mapping.data_start_row,
-          format_type: mapping.format_type,
+          header_row: headerRow,
+          data_start_row: dataStartRow,
           user_hint: userHint,
         }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        setError(data.detail || "列分析に失敗しました")
-        return
-      }
-
-      // Update mapping with column analysis results
-      setMapping((prev) =>
-        prev
-          ? {
-              ...prev,
-              question_col: data.question_col,
-              answer_col: data.answer_col,
-              choices_col: data.choices_col || "",
-              remarks_col: data.remarks_col || "",
-              confidence: {
-                ...prev.confidence,
-                question_col: data.confidence?.question_col || "low",
-                answer_col: data.confidence?.answer_col || "low",
-                choices_col: data.confidence?.choices_col || "low",
-                remarks_col: data.confidence?.remarks_col || "low",
-              },
-              reasoning: {
-                ...prev.reasoning,
-                question_col: data.reasoning?.question_col || "",
-                answer_col: data.reasoning?.answer_col || "",
-                choices_col: data.reasoning?.choices_col || "",
-                remarks_col: data.reasoning?.remarks_col || "",
-              },
-            }
-          : prev
-      )
+      if (!res.ok) { setError(data.detail || "列分析に失敗しました"); return }
+      setColumnDefs(data.column_definitions || [])
+      setRowStructure(data.row_structure || "")
       setStep("columns")
     } finally {
       setAnalyzingColumns(false)
     }
-  }, [mapping, tempFileId, fileFormat, bankId, userHint, selectedTableIndex])
+  }, [tempFileId, bankId, fileFormat, selectedTableIndex, headerRow, dataStartRow, userHint])
 
   const handleConfirm = useCallback(async () => {
-    if (!mapping || !bankId || !qaFileName) return
+    if (!bankId || !qaFileName) return
     setConfirming(true)
     setError("")
 
@@ -246,69 +236,65 @@ export default function FormatAnalyzePage() {
           qa_file_name: qaFileName,
           temp_file_id: tempFileId,
           file_format: fileFormat,
-          ...mapping,
+          header_row: headerRow,
+          data_start_row: dataStartRow,
+          table_index: selectedTableIndex,
+          column_definitions: columnDefs,
+          row_structure: rowStructure,
         }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        setError(data.detail || "保存に失敗しました")
-        return
-      }
+      if (!res.ok) { setError(data.detail || "保存に失敗しました"); return }
       navigate(`/banks/${bankId}`)
     } finally {
       setConfirming(false)
     }
-  }, [mapping, bankId, qaFileName, tempFileId, fileFormat, navigate])
+  }, [bankId, qaFileName, tempFileId, fileFormat, headerRow, dataStartRow, selectedTableIndex, columnDefs, rowStructure, navigate])
 
-  const updateMapping = (key: string, value: string | number) => {
-    if (!mapping) return
-    setMapping({ ...mapping, [key]: value })
-  }
-
-  // Determine which columns are highlighted (only in columns step)
+  // Column highlights for preview table
   const highlightedCols = new Map<string, string>()
-  if (step === "columns" && mapping && preview) {
-    for (const [field, cssClass] of Object.entries(COL_HIGHLIGHT)) {
-      const col = mapping[field as keyof Suggestion] as string
-      if (col && preview.col_letters.includes(col)) {
-        highlightedCols.set(col, cssClass)
+  if (step === "columns" && preview) {
+    for (const def of columnDefs) {
+      const color = COL_HIGHLIGHT_BY_ROLE[def.role]
+      if (color && preview.col_letters.includes(def.col)) {
+        highlightedCols.set(def.col, color)
       }
     }
   }
 
-  // Build column option labels for dropdowns (docx: show header text)
+  // Column option labels for docx
   const isDocx = fileFormat === "docx"
   const colOptionLabels: Record<string, string> = {}
-  const colOptionLabelsWithEmpty: Record<string, string> = { "": "(なし)" }
   if (preview) {
-    const headerRow = preview.rows.find((r) => r.row_num === (mapping?.header_row || 1))
+    const hRow = preview.rows.find((r) => r.row_num === headerRow)
     preview.col_letters.forEach((col, ci) => {
       if (isDocx) {
-        const headerText = headerRow?.cells[ci]?.trim() || ""
-        const label = headerText
-          ? `「${headerText}」(${ci + 1}列目)`
-          : `${ci + 1}列目`
-        colOptionLabels[col] = label
-        colOptionLabelsWithEmpty[col] = label
+        const ht = hRow?.cells[ci]?.trim() || ""
+        colOptionLabels[col] = ht ? `「${ht}」(${ci + 1}列目)` : `${ci + 1}列目`
       } else {
         colOptionLabels[col] = col
-        colOptionLabelsWithEmpty[col] = col
       }
     })
   }
 
-  const allLowConfidence =
-    mapping?.confidence &&
-    Object.values(mapping.confidence).every((c) => c === "low")
+  const updateColDef = (index: number, field: keyof ColumnDef, value: string) => {
+    setColumnDefs((prev) => prev.map((d, i) => i === index ? { ...d, [field]: value } : d))
+  }
+  const removeColDef = (index: number) => {
+    setColumnDefs((prev) => prev.filter((_, i) => i !== index))
+  }
+  const addColDef = () => {
+    const usedCols = new Set(columnDefs.map((d) => d.col))
+    const nextCol = preview?.col_letters.find((c) => !usedCols.has(c)) || "A"
+    setColumnDefs((prev) => [...prev, { col: nextCol, role: "other", description: "" }])
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link to={`/banks/${bankId}`}>
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div>
           <h1 className="text-2xl font-bold">フォーマット分析</h1>
@@ -316,31 +302,22 @@ export default function FormatAnalyzePage() {
         </div>
       </div>
 
-      {/* Step indicator */}
       {step !== "upload" && (
         <div className="flex items-center gap-2 text-sm">
-          <span className={step === "basic" ? "font-bold text-primary" : "text-muted-foreground"}>
-            Step 1: 基本設定
-          </span>
+          <span className={step === "basic" ? "font-bold text-primary" : "text-muted-foreground"}>Step 1: 基本設定</span>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          <span className={step === "columns" ? "font-bold text-primary" : "text-muted-foreground"}>
-            Step 2: 列マッピング
-          </span>
+          <span className={step === "columns" ? "font-bold text-primary" : "text-muted-foreground"}>Step 2: 列定義</span>
         </div>
       )}
 
       {error && (
-        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </div>
+        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
       )}
 
-      {/* ===== Step: Upload ===== */}
+      {/* ===== Upload ===== */}
       {step === "upload" && (
         <Card>
-          <CardHeader>
-            <CardTitle>ファイルアップロード</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>ファイルアップロード</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
               アンケートファイル（xlsx/docx）をアップロードすると、AIがフォーマットを自動解析します。
@@ -353,59 +330,27 @@ export default function FormatAnalyzePage() {
               {file ? (
                 <p className="text-sm font-medium">{file.name}</p>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  クリックしてファイルを選択
-                </p>
+                <p className="text-sm text-muted-foreground">クリックしてファイルを選択</p>
               )}
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".xlsx,.docx"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
+              <input ref={fileRef} type="file" accept=".xlsx,.docx" className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] || null)} />
             </div>
-            <Button
-              onClick={handleAnalyze}
-              disabled={!file || analyzing}
-              className="w-full"
-            >
-              {analyzing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  AIで分析中...
-                </>
-              ) : (
-                "AIで自動分析"
-              )}
+            <Button onClick={handleAnalyze} disabled={!file || analyzing} className="w-full">
+              {analyzing ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />AIで分析中...</>) : "AIで自動分析"}
             </Button>
           </CardContent>
         </Card>
       )}
 
       {/* ===== Step A: Basic Settings ===== */}
-      {step === "basic" && preview && mapping && (
+      {step === "basic" && preview && (
         <>
-          {allLowConfidence && (
-            <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-800">
-              自動解析の精度が低いです。手動で調整してください。
-            </div>
-          )}
-
-          <PreviewTable
-            preview={preview}
-            mapping={mapping}
-            fileFormat={fileFormat}
-            fileName={fileName}
-            highlightedCols={new Map()}
-          />
+          <PreviewTable preview={preview} headerRow={headerRow} dataStartRow={dataStartRow}
+            fileFormat={fileFormat} fileName={fileName} highlightedCols={new Map()} />
 
           <Card>
-            <CardHeader>
-              <CardTitle>基本設定の確認</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>基本設定の確認</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {/* File format display */}
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-muted-foreground">ファイル形式:</span>
                 <Badge variant="outline">{fileFormat.toUpperCase()}</Badge>
@@ -415,12 +360,8 @@ export default function FormatAnalyzePage() {
               {isDocx && preview.tables_summary && preview.tables_summary.length > 1 && (
                 <div className="space-y-1.5">
                   <Label className="text-sm">対象テーブル</Label>
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    value={selectedTableIndex}
-                    onChange={(e) => handleTableChange(parseInt(e.target.value))}
-                    disabled={reanalyzing}
-                  >
+                  <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                    value={selectedTableIndex} onChange={(e) => handleTableChange(parseInt(e.target.value))} disabled={reanalyzing}>
                     {preview.tables_summary.map((t) => (
                       <option key={t.index} value={t.index}>
                         テーブル{t.index + 1}: {t.rows}行×{t.cols}列 — {t.header.slice(0, 40)}{t.header.length > 40 ? "..." : ""}
@@ -428,187 +369,119 @@ export default function FormatAnalyzePage() {
                       </option>
                     ))}
                   </select>
-                  {reanalyzing && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      テーブルを再分析中...
-                    </p>
-                  )}
+                  {reanalyzing && <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />再分析中...</p>}
                 </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <MappingFieldNumber
-                  label="ヘッダー行"
-                  field="header_row"
-                  value={mapping.header_row}
-                  confidence={mapping.confidence?.header_row}
-                  reasoning={mapping.reasoning?.header_row}
-                  onChange={(v) => updateMapping("header_row", v)}
-                />
-
-                <MappingFieldNumber
-                  label="データ開始行"
-                  field="data_start_row"
-                  value={mapping.data_start_row}
-                  confidence={mapping.confidence?.data_start_row}
-                  reasoning={mapping.reasoning?.data_start_row}
-                  onChange={(v) => updateMapping("data_start_row", v)}
-                />
-
-                <MappingFieldSelect
-                  label="フォーマット類型"
-                  field="format_type"
-                  value={mapping.format_type}
-                  confidence={mapping.confidence?.format_type}
-                  reasoning={mapping.reasoning?.format_type}
-                  options={FORMAT_TYPE_OPTIONS}
-                  onChange={(v) => updateMapping("format_type", v)}
-                />
-
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm">ヘッダー行</Label>
+                    {basicSuggestion?.confidence?.header_row && (
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${CONFIDENCE_COLORS[basicSuggestion.confidence.header_row] || ""}`}>
+                        信頼度: {CONFIDENCE_LABELS[basicSuggestion.confidence.header_row] || ""}
+                      </Badge>
+                    )}
+                  </div>
+                  <Input type="number" min={1} value={headerRow} onChange={(e) => setHeaderRow(parseInt(e.target.value) || 1)} />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm">データ開始行</Label>
+                    {basicSuggestion?.confidence?.data_start_row && (
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${CONFIDENCE_COLORS[basicSuggestion.confidence.data_start_row] || ""}`}>
+                        信頼度: {CONFIDENCE_LABELS[basicSuggestion.confidence.data_start_row] || ""}
+                      </Badge>
+                    )}
+                  </div>
+                  <Input type="number" min={1} value={dataStartRow} onChange={(e) => setDataStartRow(parseInt(e.target.value) || 1)} />
+                </div>
               </div>
 
-              {/* Word: user hint */}
+              {/* Word: hint */}
               {isDocx && (
                 <div className="space-y-1.5">
                   <Label className="text-sm">構造のヒント（任意）</Label>
-                  <textarea
-                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-h-[60px]"
-                    value={userHint}
-                    onChange={(e) => setUserHint(e.target.value)}
-                    placeholder="例: 左から番号、分類、質問、回答の順です / 5列目が質問、6列目が回答です"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Wordファイルの構造をAIに伝えることで、列マッピングの精度が向上します。
-                  </p>
+                  <textarea className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px]"
+                    value={userHint} onChange={(e) => setUserHint(e.target.value)}
+                    placeholder="例: 左から番号、分類、質問、回答の順です" />
+                  <p className="text-xs text-muted-foreground">Wordファイルの構造をAIに伝えることで、列定義の精度が向上します。</p>
                 </div>
               )}
 
-              <div className="pt-2">
-                <Button
-                  onClick={handleNextToColumns}
-                  disabled={analyzingColumns}
-                  className="w-full"
-                >
-                  {analyzingColumns ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      列マッピングを分析中...
-                    </>
-                  ) : (
-                    <>
-                      次へ：列マッピング設定
-                      <ChevronRight className="h-4 w-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              </div>
+              <Button onClick={handleNextToColumns} disabled={analyzingColumns} className="w-full">
+                {analyzingColumns ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />列定義を分析中...</>) : (<>次へ：列定義<ChevronRight className="h-4 w-4 ml-2" /></>)}
+              </Button>
             </CardContent>
           </Card>
         </>
       )}
 
-      {/* ===== Step B: Column Mapping ===== */}
-      {step === "columns" && preview && mapping && (
+      {/* ===== Step B: Column Definitions ===== */}
+      {step === "columns" && preview && (
         <>
-          <PreviewTable
-            preview={preview}
-            mapping={mapping}
-            fileFormat={fileFormat}
-            fileName={fileName}
-            highlightedCols={highlightedCols}
-          />
+          <PreviewTable preview={preview} headerRow={headerRow} dataStartRow={dataStartRow}
+            fileFormat={fileFormat} fileName={fileName} highlightedCols={highlightedCols} />
 
           <Card>
             <CardHeader>
-              <CardTitle>列マッピング設定</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>列定義</span>
+                <Button variant="outline" size="sm" onClick={addColDef}>
+                  <Plus className="h-3 w-3 mr-1" />追加
+                </Button>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <MappingField
-                  label="質問列"
-                  field="question_col"
-                  value={mapping.question_col}
-                  confidence={mapping.confidence?.question_col}
-                  reasoning={mapping.reasoning?.question_col}
-                  options={preview.col_letters}
-                  optionLabels={colOptionLabels}
-                  onChange={(v) => updateMapping("question_col", v)}
-                />
-
-                <MappingField
-                  label="回答列"
-                  field="answer_col"
-                  value={mapping.answer_col}
-                  confidence={mapping.confidence?.answer_col}
-                  reasoning={mapping.reasoning?.answer_col}
-                  options={preview.col_letters}
-                  optionLabels={colOptionLabels}
-                  onChange={(v) => updateMapping("answer_col", v)}
-                />
-
-                {mapping.format_type !== "freetext" && (
-                  <MappingField
-                    label={
-                      mapping.format_type === "assessment"
-                        ? "判定欄列"
-                        : "選択肢列"
-                    }
-                    field="choices_col"
-                    value={mapping.choices_col}
-                    confidence={mapping.confidence?.choices_col}
-                    reasoning={mapping.reasoning?.choices_col}
-                    options={["", ...preview.col_letters]}
-                    optionLabels={colOptionLabelsWithEmpty}
-                    onChange={(v) => updateMapping("choices_col", v)}
-                  />
-                )}
-
-                {mapping.format_type !== "freetext" && (
-                  <MappingField
-                    label="備考列"
-                    field="remarks_col"
-                    value={mapping.remarks_col}
-                    confidence={mapping.confidence?.remarks_col}
-                    reasoning={mapping.reasoning?.remarks_col}
-                    options={["", ...preview.col_letters]}
-                    optionLabels={colOptionLabelsWithEmpty}
-                    onChange={(v) => updateMapping("remarks_col", v)}
-                  />
-                )}
-              </div>
+            <CardContent className="space-y-3">
+              {columnDefs.length === 0 && (
+                <p className="text-sm text-muted-foreground">列定義がありません。「追加」ボタンで列を登録してください。</p>
+              )}
+              {columnDefs.map((def, i) => (
+                <div key={i} className={`flex items-center gap-2 p-2 rounded border ${ROLE_COLORS[def.role] || "border-border"}`}>
+                  <select className="h-8 rounded border border-input bg-transparent px-2 text-sm w-20"
+                    value={def.col} onChange={(e) => updateColDef(i, "col", e.target.value)}>
+                    {preview.col_letters.map((c) => (
+                      <option key={c} value={c}>{colOptionLabels[c] || c}</option>
+                    ))}
+                  </select>
+                  <select className="h-8 rounded border border-input bg-transparent px-2 text-sm w-44"
+                    value={def.role} onChange={(e) => updateColDef(i, "role", e.target.value)}>
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                  <Input className="h-8 flex-1 text-sm" placeholder="説明（例: 規定内容・確認事項）"
+                    value={def.description} onChange={(e) => updateColDef(i, "description", e.target.value)} />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeColDef(i)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
-          {/* Confirm */}
+          <Card>
+            <CardHeader><CardTitle>行構造の説明</CardTitle></CardHeader>
+            <CardContent>
+              <textarea className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
+                value={rowStructure} onChange={(e) => setRowStructure(e.target.value)}
+                placeholder="例: 各行は1つの確認項目に対応。A列に通番、B-C列に分類、E列に質問（規定内容）、F列に回答を記入。" />
+              <p className="text-xs text-muted-foreground mt-1">回答生成AIにこの説明がプロンプトとして渡されます。</p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardContent className="space-y-4 pt-6">
               <div className="space-y-2">
                 <Label>QAファイル名</Label>
-                <Input
-                  value={qaFileName}
-                  onChange={(e) => setQaFileName(e.target.value)}
-                  placeholder="例: セキュリティチェックシート"
-                />
+                <Input value={qaFileName} onChange={(e) => setQaFileName(e.target.value)} placeholder="例: セキュリティチェックシート" />
               </div>
               <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setStep("basic")}
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  戻る
+                <Button variant="outline" onClick={() => setStep("basic")}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />戻る
                 </Button>
-                <Button
-                  onClick={handleConfirm}
-                  disabled={confirming || !qaFileName}
-                  className="flex-1"
-                >
-                  {confirming ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Check className="h-4 w-4 mr-2" />
-                  )}
+                <Button onClick={handleConfirm} disabled={confirming || !qaFileName || columnDefs.length === 0} className="flex-1">
+                  {confirming ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
                   確定して保存
                 </Button>
               </div>
@@ -623,14 +496,11 @@ export default function FormatAnalyzePage() {
 /* ---- Sub-components ---- */
 
 function PreviewTable({
-  preview,
-  mapping,
-  fileFormat,
-  fileName,
-  highlightedCols,
+  preview, headerRow, dataStartRow, fileFormat, fileName, highlightedCols,
 }: {
   preview: Preview
-  mapping: Suggestion
+  headerRow: number
+  dataStartRow: number
   fileFormat: string
   fileName: string
   highlightedCols: Map<string, string>
@@ -641,9 +511,7 @@ function PreviewTable({
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>ファイルプレビュー</span>
-          <span className="text-sm font-normal text-muted-foreground">
-            {fileName} ({preview.total_rows}行)
-          </span>
+          <span className="text-sm font-normal text-muted-foreground">{fileName} ({preview.total_rows}行)</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -651,34 +519,13 @@ function PreviewTable({
           <table className="w-full border-collapse text-xs">
             <thead>
               <tr>
-                <th className="sticky left-0 z-10 w-10 bg-gray-100 border border-gray-300 px-1.5 py-1 text-center text-muted-foreground font-normal">
-                  #
-                </th>
+                <th className="sticky left-0 z-10 w-10 bg-gray-100 border border-gray-300 px-1.5 py-1 text-center text-muted-foreground font-normal">#</th>
                 {preview.col_letters.map((col, ci) => {
                   const colLabel = isDocx ? `${ci + 1}列目` : col
                   const highlight = highlightedCols.get(col) || ""
-                  const roleLabel = Object.entries(COL_HIGHLIGHT).find(
-                    ([field]) =>
-                      (mapping[field as keyof Suggestion] as string) === col
-                  )?.[0]
-                    ?.replace("_col", "")
-                    .replace("question", "質問")
-                    .replace("answer", "回答")
-                    .replace("choices", "選択肢")
-                    .replace("remarks", "備考")
                   return (
-                    <th
-                      key={col}
-                      className={`min-w-[80px] bg-gray-100 border border-gray-300 px-1.5 py-1 text-center font-medium ${highlight}`}
-                    >
-                      <div className="flex items-center justify-center gap-1">
-                        {colLabel}
-                        {roleLabel && (
-                          <span className="text-[9px] opacity-60">
-                            {roleLabel}
-                          </span>
-                        )}
-                      </div>
+                    <th key={col} className={`min-w-[80px] bg-gray-100 border border-gray-300 px-1.5 py-1 text-center font-medium ${highlight}`}>
+                      {colLabel}
                     </th>
                   )
                 })}
@@ -686,27 +533,13 @@ function PreviewTable({
             </thead>
             <tbody>
               {preview.rows.map((row) => (
-                <tr
-                  key={row.row_num}
-                  className={
-                    row.row_num === mapping.header_row
-                      ? "bg-blue-50 font-medium"
-                      : row.row_num < mapping.data_start_row
-                        ? "bg-gray-50/50 text-muted-foreground"
-                        : ""
-                  }
-                >
-                  <td className="sticky left-0 z-10 bg-gray-100 border border-gray-300 px-1.5 py-0.5 text-center text-muted-foreground">
-                    {row.row_num}
-                  </td>
+                <tr key={row.row_num} className={
+                  row.row_num === headerRow ? "bg-blue-50 font-medium"
+                    : row.row_num < dataStartRow ? "bg-gray-50/50 text-muted-foreground" : ""
+                }>
+                  <td className="sticky left-0 z-10 bg-gray-100 border border-gray-300 px-1.5 py-0.5 text-center text-muted-foreground">{row.row_num}</td>
                   {row.cells.map((cell, ci) => (
-                    <td
-                      key={ci}
-                      className={`border border-gray-200 px-1.5 py-0.5 truncate max-w-[200px] ${
-                        highlightedCols.get(preview.col_letters[ci]) || ""
-                      }`}
-                      title={cell}
-                    >
+                    <td key={ci} className={`border border-gray-200 px-1.5 py-0.5 truncate max-w-[200px] ${highlightedCols.get(preview.col_letters[ci]) || ""}`} title={cell}>
                       {cell || <span className="text-muted-foreground">-</span>}
                     </td>
                   ))}
@@ -717,168 +550,5 @@ function PreviewTable({
         </div>
       </CardContent>
     </Card>
-  )
-}
-
-function MappingField({
-  label,
-  field,
-  value,
-  confidence,
-  reasoning,
-  options,
-  optionLabels,
-  onChange,
-}: {
-  label: string
-  field: string
-  value: string
-  confidence?: string
-  reasoning?: string
-  options: string[]
-  optionLabels?: Record<string, string>
-  onChange: (v: string) => void
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
-        <Label className="text-sm">{label}</Label>
-        {confidence && (
-          <Badge
-            variant="outline"
-            className={`text-[10px] px-1.5 py-0 ${CONFIDENCE_COLORS[confidence] || ""}`}
-          >
-            信頼度: {CONFIDENCE_LABELS[confidence] || confidence}
-          </Badge>
-        )}
-      </div>
-      <select
-        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {optionLabels?.[opt] ?? (opt || "(なし)")}
-          </option>
-        ))}
-      </select>
-      {reasoning && (
-        <Collapsible>
-          <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
-            <ChevronDown className="h-3 w-3" />
-            AI判断理由
-          </CollapsibleTrigger>
-          <CollapsibleContent className="text-xs text-muted-foreground mt-1 pl-4">
-            {reasoning}
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-    </div>
-  )
-}
-
-function MappingFieldNumber({
-  label,
-  field,
-  value,
-  confidence,
-  reasoning,
-  onChange,
-}: {
-  label: string
-  field: string
-  value: number
-  confidence?: string
-  reasoning?: string
-  onChange: (v: number) => void
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
-        <Label className="text-sm">{label}</Label>
-        {confidence && (
-          <Badge
-            variant="outline"
-            className={`text-[10px] px-1.5 py-0 ${CONFIDENCE_COLORS[confidence] || ""}`}
-          >
-            信頼度: {CONFIDENCE_LABELS[confidence] || confidence}
-          </Badge>
-        )}
-      </div>
-      <Input
-        type="number"
-        min={1}
-        value={value}
-        onChange={(e) => onChange(parseInt(e.target.value) || 1)}
-      />
-      {reasoning && (
-        <Collapsible>
-          <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
-            <ChevronDown className="h-3 w-3" />
-            AI判断理由
-          </CollapsibleTrigger>
-          <CollapsibleContent className="text-xs text-muted-foreground mt-1 pl-4">
-            {reasoning}
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-    </div>
-  )
-}
-
-function MappingFieldSelect({
-  label,
-  field,
-  value,
-  confidence,
-  reasoning,
-  options,
-  onChange,
-}: {
-  label: string
-  field: string
-  value: string
-  confidence?: string
-  reasoning?: string
-  options: { value: string; label: string }[]
-  onChange: (v: string) => void
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
-        <Label className="text-sm">{label}</Label>
-        {confidence && (
-          <Badge
-            variant="outline"
-            className={`text-[10px] px-1.5 py-0 ${CONFIDENCE_COLORS[confidence] || ""}`}
-          >
-            信頼度: {CONFIDENCE_LABELS[confidence] || confidence}
-          </Badge>
-        )}
-      </div>
-      <select
-        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      {reasoning && (
-        <Collapsible>
-          <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
-            <ChevronDown className="h-3 w-3" />
-            AI判断理由
-          </CollapsibleTrigger>
-          <CollapsibleContent className="text-xs text-muted-foreground mt-1 pl-4">
-            {reasoning}
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-    </div>
   )
 }

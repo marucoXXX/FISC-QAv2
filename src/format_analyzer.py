@@ -383,93 +383,58 @@ def _default_suggestion() -> Dict[str, Any]:
     }
 
 
-_COLUMN_ANALYSIS_SYSTEM_PROMPT = """\
-あなたは金融機関のアンケート（質問票）の列マッピングを特定する専門家です。
-ヘッダー行とデータ行が提供されます。各列がどの役割かを特定してください。
+COLUMN_ROLES = [
+    "question",   # 質問・確認事項
+    "answer",     # 回答欄
+    "category",   # 分類・カテゴリ
+    "remarks",    # 備考
+    "number",     # 番号
+    "reference",  # 参照・エビデンス
+    "judgment",   # 判定（○/△/×等）
+    "other",      # その他
+]
 
-分析対象:
-1. question_col: 質問文・確認事項が書かれている列の記号（例: "D"）— 長いテキストが入っている列
-2. answer_col: 回答を記入すべき列の記号（例: "E"）— 空欄が多い、または回答テキストが入る列
-3. choices_col: 選択肢や判定記号（○/△/×等）の列（該当する場合のみ、なければ空文字）
-4. remarks_col: 備考・コメント欄の列（該当する場合のみ、なければ空文字）
+_COLUMN_DEFS_SYSTEM_PROMPT = """\
+あなたは金融機関のアンケート（質問票）の構造を分析する専門家です。
+ヘッダー行とデータ行が提供されます。ワークフローに重要な列を特定し、各列の役割と説明を記述してください。
+
+役割タグ（role）:
+- question: 質問文・確認事項
+- answer: 回答を記入する列
+- category: 分類・カテゴリ
+- remarks: 備考・コメント
+- number: 通し番号
+- reference: 参照・エビデンス・判断基準
+- judgment: 判定記号（○/△/×等）
+- other: その他の重要列
+
+重要でない列（空列、繰り返しの結合セル等）は含めなくて構いません。
+必ず question と answer の役割を1つずつ含めてください。
+
+また、行の構造を自然言語で説明してください。
+この説明は、回答生成AIに「このアンケートの各行がどういう構造か」を伝えるために使います。
 
 以下のJSON形式で回答してください:
 {
-  "question_col": "D",
-  "answer_col": "E",
-  "choices_col": "",
-  "remarks_col": "",
-  "confidence": {
-    "question_col": "high",
-    "answer_col": "high",
-    "choices_col": "low",
-    "remarks_col": "low"
-  },
-  "reasoning": {
-    "question_col": "判断理由",
-    "answer_col": "判断理由",
-    "choices_col": "判断理由",
-    "remarks_col": "判断理由"
-  }
+  "column_definitions": [
+    {"col": "A", "role": "number", "description": "通し番号"},
+    {"col": "E", "role": "question", "description": "規定内容・確認事項"}
+  ],
+  "row_structure": "各行は1つの確認項目に対応。A列に通番、B-C列に分類、E列に質問、F列に回答を記入。"
 }
-
-confidenceは "high" | "medium" | "low" のいずれかです。
 """
 
-_COLUMN_RESPONSE_SCHEMA = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "column_analysis",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "properties": {
-                "question_col": {"type": "string"},
-                "answer_col": {"type": "string"},
-                "choices_col": {"type": "string"},
-                "remarks_col": {"type": "string"},
-                "confidence": {
-                    "type": "object",
-                    "properties": {
-                        "question_col": {"type": "string"},
-                        "answer_col": {"type": "string"},
-                        "choices_col": {"type": "string"},
-                        "remarks_col": {"type": "string"},
-                    },
-                    "required": ["question_col", "answer_col", "choices_col", "remarks_col"],
-                    "additionalProperties": False,
-                },
-                "reasoning": {
-                    "type": "object",
-                    "properties": {
-                        "question_col": {"type": "string"},
-                        "answer_col": {"type": "string"},
-                        "choices_col": {"type": "string"},
-                        "remarks_col": {"type": "string"},
-                    },
-                    "required": ["question_col", "answer_col", "choices_col", "remarks_col"],
-                    "additionalProperties": False,
-                },
-            },
-            "required": ["question_col", "answer_col", "choices_col", "remarks_col", "confidence", "reasoning"],
-            "additionalProperties": False,
-        },
-    },
-}
 
-
-def _build_column_prompt(
+def _build_column_defs_prompt(
     preview: Dict[str, Any],
     header_row: int,
     data_start_row: int,
-    format_type: str,
     user_hint: str = "",
 ) -> str:
     """2次分析用プロンプト: ヘッダー行＋データ行のみを送る."""
     col_letters = preview["col_letters"]
     lines = []
 
-    # ヘッダー行
     header = next((r for r in preview["rows"] if r["row_num"] == header_row), None)
     if header:
         parts = []
@@ -479,7 +444,6 @@ def _build_column_prompt(
         lines.append(f"ヘッダー行（行{header_row}）: {' | '.join(parts)}")
     lines.append("")
 
-    # データ行（先頭5行）
     data_rows = [r for r in preview["rows"] if r["row_num"] >= data_start_row][:5]
     lines.append("データ行:")
     for row_data in data_rows:
@@ -490,18 +454,10 @@ def _build_column_prompt(
             parts.append(f'{col}="{display}"')
         lines.append(f"  行{row_data['row_num']}: {' | '.join(parts)}")
 
-    lines.append("")
-    lines.append(f"フォーマット類型: {format_type}")
-    if format_type == "freetext":
-        lines.append("→ question_col と answer_col を特定してください。choices_col と remarks_col は空文字にしてください。")
-    elif format_type == "choices":
-        lines.append("→ question_col, answer_col, choices_col（選択肢列）, remarks_col（備考列）を特定してください。")
-    elif format_type == "assessment":
-        lines.append("→ question_col, answer_col, choices_col（○/△/×判定列）, remarks_col（備考列）を特定してください。")
-
     if user_hint:
         lines.append(f"\nユーザからの補足情報:\n{user_hint}")
 
+    lines.append("\n重要な列の役割を特定し、行の構造を説明してください。")
     return "\n".join(lines)
 
 
@@ -509,34 +465,32 @@ def analyze_columns(
     preview: Dict[str, Any],
     header_row: int,
     data_start_row: int,
-    format_type: str,
     model: str,
     api_key: str,
     user_hint: str = "",
+    **kwargs: Any,
 ) -> Dict[str, Any]:
-    """確定済みの基本設定を元に、列マッピングのみをLLMで分析する（2次分析）."""
-    user_prompt = _build_column_prompt(preview, header_row, data_start_row, format_type, user_hint)
+    """確定済みの基本設定を元に、列定義＋行構造をLLMで分析する（2次分析）."""
+    user_prompt = _build_column_defs_prompt(preview, header_row, data_start_row, user_hint)
 
-    kwargs: dict = dict(
+    llm_kwargs: dict = dict(
         model=model,
-        max_tokens=2048,
+        max_tokens=4096,
         messages=[
-            {"role": "system", "content": _COLUMN_ANALYSIS_SYSTEM_PROMPT},
+            {"role": "system", "content": _COLUMN_DEFS_SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ],
         api_key=api_key or None,
     )
-    if supports_response_schema(model, None):
-        kwargs["response_format"] = _COLUMN_RESPONSE_SCHEMA
-    elif _is_openai_model(model):
-        kwargs["response_format"] = {"type": "json_object"}
+    if _is_openai_model(model):
+        llm_kwargs["response_format"] = {"type": "json_object"}
 
-    response = litellm.completion(**kwargs)
+    response = litellm.completion(**llm_kwargs)
     response_text = response.choices[0].message.content
 
     if not response_text:
-        logger.warning("Empty response from column analysis LLM")
-        return _default_column_suggestion()
+        logger.warning("Empty response from column definitions LLM")
+        return _default_column_defs_suggestion(preview)
 
     try:
         result = json.loads(response_text)
@@ -546,37 +500,24 @@ def analyze_columns(
         try:
             result = json.loads(extracted)
         except json.JSONDecodeError:
-            logger.warning("Failed to parse column analysis response: %s", response_text[:200])
-            return _default_column_suggestion()
+            logger.warning("Failed to parse column defs response: %s", response_text[:200])
+            return _default_column_defs_suggestion(preview)
 
-    for key in ("question_col", "answer_col"):
-        if key not in result:
-            return _default_column_suggestion()
+    if "column_definitions" not in result or not isinstance(result["column_definitions"], list):
+        return _default_column_defs_suggestion(preview)
 
-    result.setdefault("choices_col", "")
-    result.setdefault("remarks_col", "")
-    result.setdefault("confidence", {})
-    result.setdefault("reasoning", {})
-
+    result.setdefault("row_structure", "")
     return result
 
 
-def _default_column_suggestion() -> Dict[str, Any]:
+def _default_column_defs_suggestion(preview: Dict[str, Any]) -> Dict[str, Any]:
+    cols = preview.get("col_letters", [])
+    defs = []
+    if len(cols) >= 4:
+        defs.append({"col": cols[3], "role": "question", "description": "質問・確認事項"})
+    if len(cols) >= 5:
+        defs.append({"col": cols[4], "role": "answer", "description": "回答欄"})
     return {
-        "question_col": "D",
-        "answer_col": "E",
-        "choices_col": "",
-        "remarks_col": "",
-        "confidence": {
-            "question_col": "low",
-            "answer_col": "low",
-            "choices_col": "low",
-            "remarks_col": "low",
-        },
-        "reasoning": {
-            "question_col": "自動解析に失敗したためデフォルト値です",
-            "answer_col": "自動解析に失敗したためデフォルト値です",
-            "choices_col": "自動解析に失敗したためデフォルト値です",
-            "remarks_col": "自動解析に失敗したためデフォルト値です",
-        },
+        "column_definitions": defs,
+        "row_structure": "",
     }
