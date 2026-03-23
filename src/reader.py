@@ -102,10 +102,15 @@ def _read_file_content(path: Path) -> str:
 def _build_user_prompt(
     questions: list[Question],
     file_contents: dict[str, str],
+    format_context: str = "",
 ) -> str:
     parts = ["## ナレッジベースドキュメント\n"]
     for fname, content in file_contents.items():
         parts.append(f"### {fname}\n```\n{content}\n```\n")
+
+    if format_context:
+        parts.append("\n## アンケートのフォーマット情報\n")
+        parts.append(format_context)
 
     parts.append("\n## 回答対象の質問\n")
     for q in questions:
@@ -122,6 +127,7 @@ def run_reader(
     kb_base_dir: Path | list[Path],
     api_key: str,
     model: str = "claude-sonnet-4-20250514",
+    format_context: str = "",
 ) -> list[Answer]:
     if isinstance(kb_base_dir, (str, Path)):
         kb_base_dirs = [Path(kb_base_dir)]
@@ -138,7 +144,7 @@ def run_reader(
                 break
         file_contents[fpath] = content if content is not None else f"[ファイルが見つかりません: {fpath}]"
 
-    user_prompt = _build_user_prompt(questions, file_contents)
+    user_prompt = _build_user_prompt(questions, file_contents, format_context)
 
     kwargs: dict = dict(
         model=model,

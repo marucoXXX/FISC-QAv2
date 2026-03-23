@@ -56,6 +56,49 @@ def derive_format_config(
     )
 
 
+_ROLES_READ = {"question", "category", "number", "reference", "remarks"}
+_ROLES_WRITE = {"answer", "judgment"}
+
+_ROLE_LABELS = {
+    "question": "質問・確認事項",
+    "answer": "回答欄",
+    "category": "分類",
+    "number": "番号",
+    "reference": "参照情報",
+    "remarks": "備考",
+    "judgment": "判定欄",
+    "other": "その他",
+}
+
+
+def build_format_context(column_defs: list, row_structure: str) -> str:
+    """column_definitions + row_structure から Reader LLM 用のフォーマット文脈テキストを生成."""
+    lines = []
+
+    if row_structure:
+        lines.append(f"【行構造】\n{row_structure}")
+
+    read_cols = [d for d in column_defs if d.get("role") in _ROLES_READ]
+    write_cols = [d for d in column_defs if d.get("role") in _ROLES_WRITE]
+
+    if read_cols:
+        lines.append("\n【読み取り列（参照情報）】")
+        for d in read_cols:
+            lines.append(f"  {d['col']}列: {d.get('description', '')} ({_ROLE_LABELS.get(d['role'], d['role'])})")
+
+    if write_cols:
+        lines.append("\n【書き込み列（回答を記入する列）】")
+        for d in write_cols:
+            role = d.get("role", "")
+            desc = d.get("description", "")
+            if role == "answer":
+                lines.append(f"  {d['col']}列: {desc} → テキストで回答してください")
+            elif role == "judgment":
+                lines.append(f"  {d['col']}列: {desc} → ○/△/×の記号で判定してください")
+
+    return "\n".join(lines)
+
+
 @dataclass
 class Question:
     question_no: int
@@ -158,14 +201,23 @@ def write_answers_to_original(
     config: FormatConfig,
     output_path: Path,
     choices: dict[int, str] | None = None,
+    column_definitions: list | None = None,
 ) -> Path:
     """元ファイルの回答列に書き込み、フォーマットを維持して出力
 
     choices: assessment型の場合、choices_col に書き込む値（例: {1: "○", 2: "△"}）
+    column_definitions: 新形式の列定義。指定時は全書き込み列に対応。
     """
+    # column_definitions から書き込み列を動的に決定
+    write_cols: list[tuple[str, str]] = []  # [(col_letter, role), ...]
+    if column_definitions:
+        for d in column_definitions:
+            if d.get("role") in _ROLES_WRITE:
+                write_cols.append((d["col"], d["role"]))
+
     if config.file_format == "docx":
-        return _write_docx_answers(original_path, answers, config, output_path, choices)
-    return _write_xlsx_answers(original_path, answers, config, output_path, choices)
+        return _write_docx_answers(original_path, answers, config, output_path, choices, write_cols)
+    return _write_xlsx_answers(original_path, answers, config, output_path, choices, write_cols)
 
 
 def _write_xlsx_answers(
@@ -174,14 +226,28 @@ def _write_xlsx_answers(
     config: FormatConfig,
     output_path: Path,
     choices: dict[int, str] | None = None,
+    write_cols: list[tuple[str, str]] | None = None,
 ) -> Path:
     from openpyxl import load_workbook
     from openpyxl.cell.cell import MergedCell
 
     wb = load_workbook(str(original_path))
     ws = wb.active
-    a_col = config.answer_col.upper()
-    c_col = config.choices_col.upper() if config.choices_col else ""
+
+    # 書き込み先の列を決定
+    answer_cols: list[str] = []
+    judgment_cols: list[str] = []
+    if write_cols:
+        for col_letter, role in write_cols:
+            if role == "answer":
+                answer_cols.append(col_letter.upper())
+            elif role == "judgment":
+                judgment_cols.append(col_letter.upper())
+    else:
+        # 後方互換: 旧フィールドを使用
+        answer_cols = [config.answer_col.upper()]
+        if config.choices_col:
+            judgment_cols = [config.choices_col.upper()]
 
     no = 0
     for row_idx in range(config.data_start_row, ws.max_row + 1):
@@ -190,14 +256,18 @@ def _write_xlsx_answers(
         if isinstance(q_cell, MergedCell) or not q_cell.value or not str(q_cell.value).strip():
             continue
         no += 1
+        # 回答列に書き込み
         if no in answers:
-            cell = ws[f"{a_col}{row_idx}"]
-            if not isinstance(cell, MergedCell):
-                cell.value = answers[no]
-        if choices and c_col and no in choices:
-            cell = ws[f"{c_col}{row_idx}"]
-            if not isinstance(cell, MergedCell):
-                cell.value = choices[no]
+            for a_col in answer_cols:
+                cell = ws[f"{a_col}{row_idx}"]
+                if not isinstance(cell, MergedCell):
+                    cell.value = answers[no]
+        # 判定列に書き込み
+        if choices and no in choices:
+            for j_col in judgment_cols:
+                cell = ws[f"{j_col}{row_idx}"]
+                if not isinstance(cell, MergedCell):
+                    cell.value = choices[no]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(output_path))
@@ -211,6 +281,7 @@ def _write_docx_answers(
     config: FormatConfig,
     output_path: Path,
     choices: dict[int, str] | None = None,
+    write_cols: list[tuple[str, str]] | None = None,
 ) -> Path:
     from docx import Document
 
@@ -219,25 +290,42 @@ def _write_docx_answers(
         return output_path
 
     table = doc.tables[config.table_index]
-    a_idx = _col_letter_to_index(config.answer_col)
     q_idx = _col_letter_to_index(config.question_col)
-    c_idx = _col_letter_to_index(config.choices_col) if config.choices_col else -1
+
+    # 書き込み先の列インデックスを決定
+    answer_idxs: list[int] = []
+    judgment_idxs: list[int] = []
+    if write_cols:
+        for col_letter, role in write_cols:
+            idx = _col_letter_to_index(col_letter)
+            if role == "answer":
+                answer_idxs.append(idx)
+            elif role == "judgment":
+                judgment_idxs.append(idx)
+    else:
+        answer_idxs = [_col_letter_to_index(config.answer_col)]
+        if config.choices_col:
+            judgment_idxs = [_col_letter_to_index(config.choices_col)]
 
     no = 0
     for i, row in enumerate(table.rows):
         if i < config.data_start_row - 1:
             continue
         cells = row.cells
-        if len(cells) <= max(q_idx, a_idx):
+        if len(cells) <= q_idx:
             continue
         q_text = cells[q_idx].text.strip()
         if not q_text:
             continue
         no += 1
         if no in answers:
-            cells[a_idx].text = answers[no]
-        if choices and 0 <= c_idx < len(cells) and no in choices:
-            cells[c_idx].text = choices[no]
+            for a_idx in answer_idxs:
+                if a_idx < len(cells):
+                    cells[a_idx].text = answers[no]
+        if choices and no in choices:
+            for j_idx in judgment_idxs:
+                if j_idx < len(cells):
+                    cells[j_idx].text = choices[no]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(output_path))

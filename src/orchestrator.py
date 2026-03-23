@@ -85,6 +85,7 @@ def _run_single_reader(
     questions: list[Question],
     kb_dirs: list[Path],
     config: Config,
+    format_context: str = "",
 ) -> list[Answer]:
     """1つの Reader を最大 max_retries 回リトライ付きで実行する。"""
     assigned_qs = [q for q in questions if q.no in assignment.questions]
@@ -99,6 +100,7 @@ def _run_single_reader(
                 kb_base_dir=kb_dirs,
                 api_key=config.api_key,
                 model=config.model,
+                format_context=format_context,
             )
         except Exception as e:
             last_error = e
@@ -128,13 +130,14 @@ def _run_readers_parallel(
     questions: list[Question],
     kb_dirs: list[Path],
     config: Config,
+    format_context: str = "",
 ) -> list[Answer]:
     """全 Reader を ThreadPoolExecutor で並列実行し、結果を集約する。"""
     all_answers: list[Answer] = []
 
     with ThreadPoolExecutor(max_workers=len(readers)) as executor:
         futures = {
-            executor.submit(_run_single_reader, r, questions, kb_dirs, config): r
+            executor.submit(_run_single_reader, r, questions, kb_dirs, config, format_context): r
             for r in readers
         }
         for future in as_completed(futures):
@@ -163,6 +166,7 @@ def run_pipeline(
     kb_dir: str | Path | list[Path],
     config: Config | None = None,
     questions_override: list[Question] | None = None,
+    format_context: str = "",
 ) -> Path:
     config = config or Config()
     questionnaire_path = Path(questionnaire_path)
@@ -249,7 +253,7 @@ def run_pipeline(
 
         # [4/5] Reader 並列実行（Fan-out → Fan-in）
         reader_results = _run_readers_parallel(
-            routing.readers, new_questions, kb_dirs, config,
+            routing.readers, new_questions, kb_dirs, config, format_context,
         )
 
         success_count = 0

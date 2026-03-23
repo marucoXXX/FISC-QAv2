@@ -186,12 +186,25 @@ def _run_session_pipeline_thread(
                 kb_dirs = [Path(config.kb_dir)]
             source_path = Path(session.get("source_file_path", ""))
 
+            # フォーマット文脈を生成（column_definitions + row_structure）
+            format_context = ""
+            col_defs_str = session.get("column_definitions", "[]")
+            row_struct = session.get("row_structure", "")
+            if col_defs_str and col_defs_str != "[]":
+                import json as _json
+                try:
+                    col_defs = _json.loads(col_defs_str)
+                    from ..file_io import build_format_context
+                    format_context = build_format_context(col_defs, row_struct)
+                except (ValueError, TypeError):
+                    pass
+
             existing_dirs = [d for d in kb_dirs if d.exists()]
             if existing_dirs:
-                # questions_overrideを渡すことでファイル読み込みをスキップ
                 output_path = run_pipeline(
                     source_path, existing_dirs, config,
                     questions_override=questions_override,
+                    format_context=format_context,
                 )
 
                 # orchestratorの出力は常に.xlsx

@@ -845,7 +845,18 @@ def create_router(
             output_dir.mkdir(parents=True, exist_ok=True)
             ext = ".docx" if (session["file_format"] or "xlsx") == "docx" else ".xlsx"
             output_path = output_dir / f"FISC回答_{session_id}{ext}"
-            write_answers_to_original(source_path, answers, fc, output_path, choices=choices)
+            # column_definitions をパースしてエクスポートに渡す
+            col_defs_for_export = None
+            col_defs_raw = session.get("column_definitions", "[]")
+            if col_defs_raw and col_defs_raw != "[]":
+                try:
+                    col_defs_for_export = json.loads(col_defs_raw)
+                except (ValueError, TypeError):
+                    pass
+            write_answers_to_original(
+                source_path, answers, fc, output_path,
+                choices=choices, column_definitions=col_defs_for_export,
+            )
 
             media = (
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
