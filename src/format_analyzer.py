@@ -383,29 +383,39 @@ def _default_suggestion() -> Dict[str, Any]:
     }
 
 
-COLUMN_ROLES = [
-    "question",   # 質問・確認事項
-    "answer",     # 回答欄
+COLUMN_ROLES_READ = [
+    "question",   # 質問・確認事項（システムが参照）
     "category",   # 分類・カテゴリ
-    "remarks",    # 備考
     "number",     # 番号
-    "reference",  # 参照・エビデンス
-    "judgment",   # 判定（○/△/×等）
-    "other",      # その他
+    "reference",  # 参照情報（判断基準・エビデンス・設定例等）
+    "remarks",    # 備考
 ]
+
+COLUMN_ROLES_WRITE = [
+    "answer",     # 回答欄（テキスト回答）（システムが記入）
+    "judgment",   # 判定欄（○/△/×等の記号）
+]
+
+COLUMN_ROLES = COLUMN_ROLES_READ + COLUMN_ROLES_WRITE + ["other"]
 
 _COLUMN_DEFS_SYSTEM_PROMPT = """\
 あなたは金融機関のアンケート（質問票）の構造を分析する専門家です。
 ヘッダー行とデータ行が提供されます。ワークフローに重要な列を特定し、各列の役割と説明を記述してください。
 
-役割タグ（role）:
+役割タグ（role）— 読み取り/書き込みで区分:
+
+読み取り列（システムが参照する列）:
 - question: 質問文・確認事項
-- answer: 回答を記入する列
 - category: 分類・カテゴリ
-- remarks: 備考・コメント
 - number: 通し番号
-- reference: 参照・エビデンス・判断基準
-- judgment: 判定記号（○/△/×等）
+- reference: 参照情報（判断基準・エビデンス・設定例等）
+- remarks: 備考
+
+書き込み列（システムが回答を記入する列）:
+- answer: 回答欄（テキスト回答）
+- judgment: 判定欄（○/△/×等の記号）
+
+その他:
 - other: その他の重要列
 
 重要でない列（空列、繰り返しの結合セル等）は含めなくて構いません。

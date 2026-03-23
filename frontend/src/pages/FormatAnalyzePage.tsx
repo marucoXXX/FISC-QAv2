@@ -51,15 +51,18 @@ type ColumnDef = {
 type Step = "upload" | "basic" | "columns"
 
 const ROLE_OPTIONS = [
+  { value: "", label: "── 読み取り列（システムが参照）──", disabled: true },
   { value: "question", label: "質問・確認事項" },
-  { value: "answer", label: "回答欄" },
   { value: "category", label: "分類・カテゴリ" },
-  { value: "remarks", label: "備考" },
   { value: "number", label: "番号" },
-  { value: "reference", label: "参照・エビデンス" },
-  { value: "judgment", label: "判定（○/△/×等）" },
+  { value: "reference", label: "参照情報（判断基準・エビデンス・設定例等）" },
+  { value: "remarks", label: "備考" },
+  { value: "", label: "── 書き込み列（システムが記入）──", disabled: true },
+  { value: "answer", label: "回答欄（テキスト回答）" },
+  { value: "judgment", label: "判定欄（○/△/×等の記号）" },
+  { value: "", label: "── その他 ──", disabled: true },
   { value: "other", label: "その他" },
-]
+] as const
 
 const ROLE_COLORS: Record<string, string> = {
   question: "bg-green-50 border-green-200",
@@ -436,8 +439,8 @@ export default function FormatAnalyzePage() {
             <CardContent className="space-y-3">
               {/* Column headers */}
               <div className="flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground">
-                <span className="w-24">列名</span>
-                <span className="w-44">意味（選択式）</span>
+                <span className="w-40">列名</span>
+                <span className="w-64">意味（選択式）</span>
                 <span className="flex-1">意味（補足説明）</span>
                 <span className="w-8" />
               </div>
@@ -447,16 +450,18 @@ export default function FormatAnalyzePage() {
               )}
               {columnDefs.map((def, i) => (
                 <div key={i} className={`flex items-center gap-2 p-2 rounded border ${ROLE_COLORS[def.role] || "border-border"}`}>
-                  <select className="h-8 rounded border border-input bg-transparent px-2 text-sm w-24"
+                  <select className="h-8 rounded border border-input bg-transparent px-2 text-sm w-40 shrink-0"
                     value={def.col} onChange={(e) => updateColDef(i, "col", e.target.value)}>
                     {preview.col_letters.map((c) => (
                       <option key={c} value={c}>{colOptionLabels[c] || c}</option>
                     ))}
                   </select>
-                  <select className="h-8 rounded border border-input bg-transparent px-2 text-sm w-44"
+                  <select className="h-8 rounded border border-input bg-transparent px-2 text-sm w-64 shrink-0"
                     value={def.role} onChange={(e) => updateColDef(i, "role", e.target.value)}>
-                    {ROLE_OPTIONS.map((r) => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
+                    {ROLE_OPTIONS.map((r, ri) => (
+                      r.disabled
+                        ? <option key={ri} value="" disabled>{r.label}</option>
+                        : <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                   </select>
                   <Input className="h-8 flex-1 text-sm" placeholder="補足説明（例: 規定内容・確認事項を記載）"
