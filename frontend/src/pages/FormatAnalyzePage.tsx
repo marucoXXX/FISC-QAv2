@@ -425,20 +425,29 @@ export default function FormatAnalyzePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>列定義</span>
-                <Button variant="outline" size="sm" onClick={addColDef}>
-                  <Plus className="h-3 w-3 mr-1" />追加
-                </Button>
-              </CardTitle>
+              <CardTitle>列定義</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                各列がアンケートのどの要素に対応するかを定義します。この情報は質問の抽出・回答の記入先の特定・回答生成AIへの指示に使用されます。
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 bg-blue-50 rounded px-2 py-1">
+                以下はAIが自動分析した提案です。内容を確認し、必要に応じて修正・追加・削除してください。
+              </p>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Column headers */}
+              <div className="flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground">
+                <span className="w-24">列名</span>
+                <span className="w-44">意味（選択式）</span>
+                <span className="flex-1">意味（補足説明）</span>
+                <span className="w-8" />
+              </div>
+
               {columnDefs.length === 0 && (
-                <p className="text-sm text-muted-foreground">列定義がありません。「追加」ボタンで列を登録してください。</p>
+                <p className="text-sm text-muted-foreground py-2">列定義がありません。「追加」ボタンで列を登録してください。</p>
               )}
               {columnDefs.map((def, i) => (
                 <div key={i} className={`flex items-center gap-2 p-2 rounded border ${ROLE_COLORS[def.role] || "border-border"}`}>
-                  <select className="h-8 rounded border border-input bg-transparent px-2 text-sm w-20"
+                  <select className="h-8 rounded border border-input bg-transparent px-2 text-sm w-24"
                     value={def.col} onChange={(e) => updateColDef(i, "col", e.target.value)}>
                     {preview.col_letters.map((c) => (
                       <option key={c} value={c}>{colOptionLabels[c] || c}</option>
@@ -450,23 +459,34 @@ export default function FormatAnalyzePage() {
                       <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                   </select>
-                  <Input className="h-8 flex-1 text-sm" placeholder="説明（例: 規定内容・確認事項）"
+                  <Input className="h-8 flex-1 text-sm" placeholder="補足説明（例: 規定内容・確認事項を記載）"
                     value={def.description} onChange={(e) => updateColDef(i, "description", e.target.value)} />
                   <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeColDef(i)}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
               ))}
+
+              <Button variant="outline" size="sm" onClick={addColDef} className="mt-2">
+                <Plus className="h-3 w-3 mr-1" />列定義を追加
+              </Button>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>行構造の説明</CardTitle></CardHeader>
-            <CardContent>
-              <textarea className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[80px]"
+            <CardHeader>
+              <CardTitle>行構造の説明</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                このアンケートの各行にどのような情報が入るかを説明してください。回答生成AIにプロンプトとして渡されます。
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <textarea className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[100px]"
                 value={rowStructure} onChange={(e) => setRowStructure(e.target.value)}
-                placeholder="例: 各行は1つの確認項目に対応。A列に通番、B-C列に分類、E列に質問（規定内容）、F列に回答を記入。" />
-              <p className="text-xs text-muted-foreground mt-1">回答生成AIにこの説明がプロンプトとして渡されます。</p>
+                placeholder={"例:\n各行は1つの確認項目（質問）に対応する。A列に通番、B-C列に分類、E列に質問（規定内容）、F列に回答を記入する。\nただし、大分類の見出し行（A列に番号がなくB列にカテゴリ名のみ記載）が途中に挿入されており、これは質問ではない。"} />
+              <p className="text-xs text-muted-foreground bg-blue-50 rounded px-2 py-1">
+                上記はAIが自動生成した説明です。特に、質問ではない行（大分類の見出し行など）がある場合はその旨を記載すると、AIの回答精度が向上します。
+              </p>
             </CardContent>
           </Card>
 
