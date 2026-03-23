@@ -64,24 +64,31 @@ const ROLE_OPTIONS = [
   { value: "other", label: "その他" },
 ] as const
 
+// 読み取り=青系、書き込み=オレンジ系、その他=グレー系
 const ROLE_COLORS: Record<string, string> = {
-  question: "bg-green-50 border-green-200",
-  answer: "bg-orange-50 border-orange-200",
+  // 読み取り列（青系）
+  question: "bg-blue-50 border-blue-200",
   category: "bg-blue-50 border-blue-200",
-  remarks: "bg-gray-50 border-gray-200",
-  number: "bg-slate-50 border-slate-200",
-  reference: "bg-violet-50 border-violet-200",
-  judgment: "bg-amber-50 border-amber-200",
+  number: "bg-blue-50 border-blue-200",
+  reference: "bg-blue-50 border-blue-200",
+  remarks: "bg-blue-50 border-blue-200",
+  // 書き込み列（オレンジ系）
+  answer: "bg-orange-50 border-orange-200",
+  judgment: "bg-orange-50 border-orange-200",
+  // その他（グレー系）
   other: "bg-neutral-50 border-neutral-200",
 }
 
 const COL_HIGHLIGHT_BY_ROLE: Record<string, string> = {
-  question: "bg-green-50",
-  answer: "bg-orange-50",
+  // 読み取り列（青系）
+  question: "bg-blue-50",
   category: "bg-blue-50",
-  remarks: "bg-gray-100",
-  judgment: "bg-amber-50",
-  reference: "bg-violet-50",
+  number: "bg-blue-50",
+  reference: "bg-blue-50",
+  remarks: "bg-blue-50",
+  // 書き込み列（オレンジ系）
+  answer: "bg-orange-50",
+  judgment: "bg-orange-50",
 }
 
 const CONFIDENCE_COLORS: Record<string, string> = {
