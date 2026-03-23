@@ -365,6 +365,9 @@ export default function FormatAnalyzePage() {
               {isDocx && preview.tables_summary && preview.tables_summary.length > 1 && (
                 <div className="space-y-1.5">
                   <Label className="text-sm">対象テーブル</Label>
+                  <p className="text-xs text-muted-foreground">
+                    このファイルには{preview.tables_summary.length}つのテーブルが見つかりました。対象のテーブルを選択してください。
+                  </p>
                   <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
                     value={selectedTableIndex} onChange={(e) => handleTableChange(parseInt(e.target.value))} disabled={reanalyzing}>
                     {preview.tables_summary.map((t) => (
