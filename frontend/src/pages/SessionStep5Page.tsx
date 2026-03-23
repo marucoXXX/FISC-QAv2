@@ -235,7 +235,18 @@ export default function SessionStep5Page() {
                     })}
 
                     {/* Format-aware: write columns */}
-                    {writeCols.map((cd) => (
+                    {writeCols.map((cd) => {
+                      // 複数answer列: 判定結果に応じて表示/非表示
+                      const answerColsOnly = writeCols.filter((w) => w.role === "answer")
+                      const hasMultiAnswers = answerColsOnly.length >= 2
+                      if (hasMultiAnswers && cd.role === "answer") {
+                        const isFirst = answerColsOnly[0]?.col === cd.col
+                        const mark = q.assessment_mark || ""
+                        // ○ or 未選択 → 1つ目表示、△/× → 2つ目表示
+                        if (mark === "○" && !isFirst) return null
+                        if ((mark === "△" || mark === "×") && isFirst) return null
+                      }
+                      return (
                       <div key={cd.col} className="border-t pt-2">
                         <p className="text-xs font-medium text-muted-foreground mb-1">
                           {cd.description}
@@ -271,7 +282,8 @@ export default function SessionStep5Page() {
                           </div>
                         )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </>
                 ) : (
                   <>

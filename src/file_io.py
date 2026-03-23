@@ -87,14 +87,23 @@ def build_format_context(column_defs: list, row_structure: str) -> str:
             lines.append(f"  {d['col']}列: {d.get('description', '')} ({_ROLE_LABELS.get(d['role'], d['role'])})")
 
     if write_cols:
+        judgment_cols = [d for d in write_cols if d.get("role") == "judgment"]
+        answer_cols = [d for d in write_cols if d.get("role") == "answer"]
+
         lines.append("\n【書き込み列（回答を記入する列）】")
-        for d in write_cols:
-            role = d.get("role", "")
-            desc = d.get("description", "")
-            if role == "answer":
-                lines.append(f"  {d['col']}列: {desc} → テキストで回答してください")
-            elif role == "judgment":
-                lines.append(f"  {d['col']}列: {desc} → ○/△/×の記号で判定してください")
+        for d in judgment_cols:
+            lines.append(f"  {d['col']}列: {d.get('description', '')} → ○/△/×の記号で判定してください")
+
+        if len(answer_cols) >= 2 and judgment_cols:
+            lines.append("")
+            lines.append("  ※ 回答列が複数あります。判定結果に応じて記入先を分けてください:")
+            for i, d in enumerate(answer_cols):
+                lines.append(f"  {d['col']}列: {d.get('description', '')}")
+            lines.append(f"  → 判定が○の場合: {answer_cols[0]['col']}列にのみ回答を記入し、{answer_cols[1]['col']}列は空にしてください")
+            lines.append(f"  → 判定が△や×の場合: {answer_cols[1]['col']}列にのみ回答を記入し、{answer_cols[0]['col']}列は空にしてください")
+        else:
+            for d in answer_cols:
+                lines.append(f"  {d['col']}列: {d.get('description', '')} → テキストで回答してください")
 
     return "\n".join(lines)
 
