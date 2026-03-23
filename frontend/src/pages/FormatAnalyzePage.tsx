@@ -64,29 +64,24 @@ const ROLE_OPTIONS = [
   { value: "other", label: "その他" },
 ] as const
 
-// 読み取り=青系、書き込み=オレンジ系、その他=グレー系
+// 読み取り=緑系、書き込み=オレンジ系、その他=グレー系
 const ROLE_COLORS: Record<string, string> = {
-  // 読み取り列（青系）
-  question: "bg-blue-50 border-blue-200",
-  category: "bg-blue-50 border-blue-200",
-  number: "bg-blue-50 border-blue-200",
-  reference: "bg-blue-50 border-blue-200",
-  remarks: "bg-blue-50 border-blue-200",
-  // 書き込み列（オレンジ系）
+  question: "bg-green-50 border-green-200",
+  category: "bg-green-50 border-green-200",
+  number: "bg-green-50 border-green-200",
+  reference: "bg-green-50 border-green-200",
+  remarks: "bg-green-50 border-green-200",
   answer: "bg-orange-50 border-orange-200",
   judgment: "bg-orange-50 border-orange-200",
-  // その他（グレー系）
   other: "bg-neutral-50 border-neutral-200",
 }
 
 const COL_HIGHLIGHT_BY_ROLE: Record<string, string> = {
-  // 読み取り列（青系）
-  question: "bg-blue-50",
-  category: "bg-blue-50",
-  number: "bg-blue-50",
-  reference: "bg-blue-50",
-  remarks: "bg-blue-50",
-  // 書き込み列（オレンジ系）
+  question: "bg-green-50",
+  category: "bg-green-50",
+  number: "bg-green-50",
+  reference: "bg-green-50",
+  remarks: "bg-green-50",
   answer: "bg-orange-50",
   judgment: "bg-orange-50",
 }
@@ -442,6 +437,20 @@ export default function FormatAnalyzePage() {
               <p className="text-xs text-muted-foreground mt-1 bg-blue-50 rounded px-2 py-1">
                 以下はAIが自動分析した提案です。内容を確認し、必要に応じて修正・追加・削除してください。
               </p>
+              <div className="flex items-center gap-4 mt-2 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded bg-green-100 border border-green-300" />
+                  読み取り列（システムが参照）
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded bg-orange-100 border border-orange-300" />
+                  書き込み列（システムが記入）
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded bg-neutral-100 border border-neutral-300" />
+                  その他
+                </span>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Column headers */}
