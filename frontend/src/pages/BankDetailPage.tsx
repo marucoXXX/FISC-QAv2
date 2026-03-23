@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useParams, Link, useNavigate } from "react-router-dom"
-import { ArrowLeft, Upload, Trash2, Search, Plus, Pencil } from "lucide-react"
+import { ArrowLeft, Upload, Trash2, Search, Plus, Pencil, ChevronDown, ChevronRight } from "lucide-react"
 import { apiFetch } from "@/lib/httpClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,19 +69,12 @@ const ROLE_LABELS: Record<string, string> = {
   other: "他",
 }
 
-function formatColumnDefsSummary(qf: QaFile): string {
-  if (!qf.column_definitions || qf.column_definitions === "[]") {
-    // 旧式フォールバック
-    const parts = [`質問:${qf.question_col}`, `回答:${qf.answer_col}`]
-    if (qf.choices_col) parts.push(`判定:${qf.choices_col}`)
-    if (qf.remarks_col) parts.push(`備考:${qf.remarks_col}`)
-    return parts.join(", ")
-  }
+function parseColumnDefs(qf: QaFile): ColumnDef[] {
+  if (!qf.column_definitions || qf.column_definitions === "[]") return []
   try {
-    const defs: ColumnDef[] = JSON.parse(qf.column_definitions)
-    return defs.map((d) => `${ROLE_LABELS[d.role] || d.role}:${d.col}`).join(", ")
+    return JSON.parse(qf.column_definitions)
   } catch {
-    return `質問:${qf.question_col}, 回答:${qf.answer_col}`
+    return []
   }
 }
 
@@ -122,6 +115,7 @@ export default function BankDetailPage() {
 
   // QA file dialog state
   const [qfDialogOpen, setQfDialogOpen] = useState(false)
+  const [expandedQfId, setExpandedQfId] = useState<number | null>(null)
   const [editingQfId, setEditingQfId] = useState<number | null>(null)
   const [qfForm, setQfForm] = useState(INITIAL_QF_FORM)
   const [qfError, setQfError] = useState("")
@@ -267,41 +261,85 @@ export default function BankDetailPage() {
           {qaFiles.length === 0 ? (
             <p className="text-sm text-muted-foreground">QAファイルが登録されていません</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>QAファイル名</TableHead>
-                  <TableHead>形式</TableHead>
-                  <TableHead>ヘッダー行</TableHead>
-                  <TableHead>データ開始行</TableHead>
-                  <TableHead>列定義</TableHead>
-                  <TableHead className="w-20"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {qaFiles.map((qf) => (
-                  <TableRow key={qf.id}>
-                    <TableCell className="font-medium">{qf.qa_file_name}</TableCell>
-                    <TableCell>{qf.file_format.toUpperCase()}</TableCell>
-                    <TableCell>{qf.header_row}</TableCell>
-                    <TableCell>{qf.data_start_row}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[300px] truncate" title={formatColumnDefsSummary(qf)}>
-                      {formatColumnDefsSummary(qf)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEditQf(qf)}>
+            <div className="space-y-2">
+              {qaFiles.map((qf) => {
+                const isExpanded = expandedQfId === qf.id
+                const colDefs = parseColumnDefs(qf)
+                return (
+                  <div key={qf.id} className="border rounded-md">
+                    {/* Summary row */}
+                    <div
+                      className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50"
+                      onClick={() => setExpandedQfId(isExpanded ? null : qf.id)}
+                    >
+                      {isExpanded
+                        ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                        : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                      <span className="font-medium text-sm flex-1">{qf.qa_file_name}</span>
+                      <span className="text-xs text-muted-foreground">{qf.file_format.toUpperCase()} / ヘッダー:{qf.header_row}行 / データ開始:{qf.data_start_row}行</span>
+                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditQf(qf)}>
                           <Pencil className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteQf(qf.id)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteQf(qf.id)}>
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
+                    {/* Expanded detail */}
+                    {isExpanded && (
+                      <div className="px-3 pb-3 pt-1 border-t space-y-3">
+                        {colDefs.length > 0 ? (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-1">列定義</p>
+                            <table className="w-full text-xs border-collapse">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="text-left py-1 pr-3 font-medium text-muted-foreground w-16">列</th>
+                                  <th className="text-left py-1 pr-3 font-medium text-muted-foreground w-32">役割</th>
+                                  <th className="text-left py-1 font-medium text-muted-foreground">説明</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {colDefs.map((d, i) => (
+                                  <tr key={i} className="border-b last:border-0">
+                                    <td className="py-1 pr-3 font-mono">{d.col}</td>
+                                    <td className="py-1 pr-3">
+                                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${
+                                        ["question","category","number","reference","remarks"].includes(d.role)
+                                          ? "bg-green-100 text-green-800"
+                                          : ["answer","judgment"].includes(d.role)
+                                            ? "bg-orange-100 text-orange-800"
+                                            : "bg-neutral-100 text-neutral-700"
+                                      }`}>
+                                        {ROLE_LABELS[d.role] || d.role}
+                                      </span>
+                                    </td>
+                                    <td className="py-1">{d.description}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            列定義: 質問列={qf.question_col}, 回答列={qf.answer_col}
+                            {qf.choices_col ? `, 判定列=${qf.choices_col}` : ""}
+                            {qf.remarks_col ? `, 備考列=${qf.remarks_col}` : ""}
+                          </p>
+                        )}
+                        {qf.row_structure && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-1">行構造の説明</p>
+                            <p className="text-xs whitespace-pre-wrap bg-muted/50 rounded p-2">{qf.row_structure}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           )}
         </CardContent>
       </Card>
