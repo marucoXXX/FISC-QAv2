@@ -84,6 +84,7 @@ export default function SessionStep5Page() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [accumulated, setAccumulated] = useState(false)
   const [drafts, setDrafts] = useState<Record<number, string>>({})
+  const [marks, setMarks] = useState<Record<number, string>>({})
   const [savedDrafts, setSavedDrafts] = useState<Record<number, string>>({})
   const [saving, setSaving] = useState<Record<number, boolean>>({})
   const [colDefs, setColDefs] = useState<ColumnDef[]>([])
@@ -108,6 +109,12 @@ export default function SessionStep5Page() {
         return next
       })
       setSavedDrafts(initDrafts)
+      // Initialize marks from assessment_mark
+      const initMarks: Record<number, string> = {}
+      for (const q of data.questions as SessionQuestion[]) {
+        initMarks[q.question_no] = q.assessment_mark || ""
+      }
+      setMarks((prev) => ({ ...initMarks, ...prev }))
     }
   }, [sessionId])
 
@@ -236,18 +243,18 @@ export default function SessionStep5Page() {
 
                     {/* Format-aware: write columns */}
                     {writeCols.map((cd) => {
-                      // 複数answer列: 判定結果に応じて表示/非表示
+                      // 複数answer列: 判定結果に応じて薄く表示
                       const answerColsOnly = writeCols.filter((w) => w.role === "answer")
                       const hasMultiAnswers = answerColsOnly.length >= 2
+                      let dimmed = false
                       if (hasMultiAnswers && cd.role === "answer") {
                         const isFirst = answerColsOnly[0]?.col === cd.col
-                        const mark = q.assessment_mark || ""
-                        // ○ or 未選択 → 1つ目表示、△/× → 2つ目表示
-                        if (mark === "○" && !isFirst) return null
-                        if ((mark === "△" || mark === "×") && isFirst) return null
+                        const mark = marks[q.question_no] || ""
+                        if (mark === "○" && !isFirst) dimmed = true
+                        if ((mark === "△" || mark === "×") && isFirst) dimmed = true
                       }
                       return (
-                      <div key={cd.col} className="border-t pt-2">
+                      <div key={cd.col} className={`border-t pt-2 ${dimmed ? "opacity-40" : ""}`}>
                         <p className="text-xs font-medium text-muted-foreground mb-1">
                           {cd.description}
                           {cd.role === "judgment" && <span className="text-[10px] ml-1">(判定)</span>}
@@ -256,9 +263,9 @@ export default function SessionStep5Page() {
                         {cd.role === "judgment" ? (
                           <select
                             className="h-8 rounded border border-input bg-transparent px-2 text-sm"
-                            value={q.assessment_mark || ""}
+                            value={marks[q.question_no] || ""}
                             onChange={(e) => {
-                              // TODO: save assessment_mark via API
+                              setMarks((prev) => ({ ...prev, [q.question_no]: e.target.value }))
                             }}
                           >
                             <option value="">未選択</option>
