@@ -53,6 +53,7 @@ class Answer:
     confidence: str = Confidence.LOW.value
     key_excerpt: str = ""
     flag: str | None = None
+    judgment: str = ""
 
 
 @dataclass

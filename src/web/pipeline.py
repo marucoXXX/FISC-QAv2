@@ -219,13 +219,18 @@ def _run_session_pipeline_thread(
                     ans = answer_map.get(q_no)
                     if ans and ans.get("answer"):
                         refs = ans.get("source_references", [])
-                        web_db.update_session_question(db_path, session_id, q_no,
+                        updates = dict(
                             answer_source="generated",
                             answer_text=ans["answer"],
                             source_references=refs,
                             confidence=ans.get("confidence", ""),
                             step_resolved=4,
                         )
+                        # Reader LLM が judgment を返した場合、assessment_mark に保存
+                        judgment = ans.get("judgment", "")
+                        if judgment and judgment in ("○", "△", "×", "◎"):
+                            updates["assessment_mark"] = judgment
+                        web_db.update_session_question(db_path, session_id, q_no, **updates)
             else:
                 job.progress.append("KBフォルダが見つかりません")
         finally:

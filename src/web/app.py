@@ -1207,6 +1207,7 @@ def _parse_excel(content: bytes) -> tuple[list[dict], list[dict], list[dict]]:
             "confidence": str(row[7] or "low"),
             "key_excerpt": "",
             "flag": str(row[8] or "") or None,
+            "judgment": str(row[9] or "") if len(row) > 9 else "",
         })
 
     notes = []

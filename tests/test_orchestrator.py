@@ -77,7 +77,7 @@ class TestReaderParallel:
         """リトライで復旧するケースを検証。"""
         call_count = 0
 
-        def flaky_reader(reader_id, questions, files, kb_base_dir, api_key, model):
+        def flaky_reader(reader_id, questions, files, kb_base_dir, api_key, model, **kwargs):
             nonlocal call_count
             call_count += 1
             if call_count < 3:

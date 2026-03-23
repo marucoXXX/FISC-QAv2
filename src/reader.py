@@ -28,12 +28,13 @@ _READER_RESPONSE_SCHEMA = {
                         "properties": {
                             "question_no": {"type": "integer"},
                             "answer": {"type": "string"},
+                            "judgment": {"type": "string"},
                             "status": {"type": "string"},
                             "source_references": {"type": "array", "items": {"type": "string"}},
                             "confidence": {"type": "string"},
                             "key_excerpt": {"type": "string"},
                         },
-                        "required": ["question_no", "answer", "status", "source_references", "confidence", "key_excerpt"],
+                        "required": ["question_no", "answer", "judgment", "status", "source_references", "confidence", "key_excerpt"],
                         "additionalProperties": False,
                     },
                 },
@@ -54,12 +55,15 @@ SYSTEM_PROMPT = """\
 3. 情報が曖昧・矛盾する場合は confidence="medium", status="要確認" とする
 4. 回答は具体的かつ簡潔に記述する
 5. 必ず根拠となるドキュメントのセクションを明記する
+6. answerフィールドには必ずテキストで回答を記述してください。○/△/×等の記号のみの回答は禁止です
+7. 判定が必要な場合（アンケートに判定欄がある場合）は judgment フィールドに ○/△/× を記入してください
 
 出力は以下のJSON形式で返してください:
 {"answers": [
   {
     "question_no": <int>,
-    "answer": "<回答テキスト>",
+    "answer": "<回答テキスト（必ず具体的な文章で記述）>",
+    "judgment": "<○/△/× の判定記号。判定欄がない場合は空文字>",
     "status": "対応済" | "要確認" | "回答不可候補",
     "source_references": ["<ファイル名> / <セクション>"],
     "confidence": "high" | "medium" | "low",
@@ -249,6 +253,7 @@ def _parse_items(
             source_references=item.get("source_references", []),
             confidence=item.get("confidence", Confidence.MEDIUM.value),
             key_excerpt=item.get("key_excerpt", ""),
+            judgment=item.get("judgment", ""),
         ))
     # Ensure all questions have answers
     answered_nos = {a.question_no for a in answers}

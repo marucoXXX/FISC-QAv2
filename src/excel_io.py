@@ -9,7 +9,7 @@ from openpyxl import Workbook, load_workbook
 
 from .models import Answer, Question, ReviewNote
 
-HEADERS = ["No.", "大分類", "小分類", "質問内容", "回答", "対応状況", "根拠ソース", "確信度", "備考"]
+HEADERS = ["No.", "大分類", "小分類", "質問内容", "回答", "対応状況", "根拠ソース", "確信度", "備考", "判定"]
 
 
 def read_questionnaire(path: Path) -> list[Question]:
@@ -54,9 +54,10 @@ def write_results(
                 ", ".join(ans.source_references) if ans.source_references else "",
                 ans.confidence,
                 ans.flag or "",
+                getattr(ans, "judgment", ""),
             ])
         else:
-            ws.append([q.no, q.major, q.minor, q.question, "", "未回答", "", "", ""])
+            ws.append([q.no, q.major, q.minor, q.question, "", "未回答", "", "", "", ""])
 
     if review_notes:
         ws2 = wb.create_sheet("レビュー指摘")
