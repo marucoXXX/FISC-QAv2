@@ -235,19 +235,8 @@ export default function SessionStep5Page() {
                     })}
 
                     {/* Format-aware: write columns */}
-                    {writeCols.map((cd, cdIdx) => {
-                      // 複数answer列がある場合、判定結果に応じて活性/非活性を切替
-                      const answerColsOnly = writeCols.filter((w) => w.role === "answer")
-                      const hasMultipleAnswers = answerColsOnly.length >= 2
-                      const isFirstAnswer = cd.role === "answer" && answerColsOnly[0]?.col === cd.col
-                      const mark = q.assessment_mark || ""
-                      const isActiveAnswer = !hasMultipleAnswers
-                        || cd.role !== "answer"
-                        || (isFirstAnswer && (mark === "○" || !mark))
-                        || (!isFirstAnswer && (mark === "△" || mark === "×"))
-
-                      return (
-                      <div key={cd.col} className={`border-t pt-2 ${!isActiveAnswer ? "opacity-40" : ""}`}>
+                    {writeCols.map((cd) => (
+                      <div key={cd.col} className="border-t pt-2">
                         <p className="text-xs font-medium text-muted-foreground mb-1">
                           {cd.description}
                           {cd.role === "judgment" && <span className="text-[10px] ml-1">(判定)</span>}
@@ -282,8 +271,7 @@ export default function SessionStep5Page() {
                           </div>
                         )}
                       </div>
-                      )
-                    })}
+                    ))}
                   </>
                 ) : (
                   <>
