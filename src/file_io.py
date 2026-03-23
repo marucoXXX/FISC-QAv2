@@ -388,11 +388,13 @@ def write_answers_to_original(
     output_path: Path,
     choices: dict[int, str] | None = None,
     column_definitions: list | None = None,
+    per_col_answers: dict[int, dict[str, str]] | None = None,
 ) -> Path:
     """元ファイルの回答列に書き込み、フォーマットを維持して出力
 
     choices: assessment型の場合、choices_col に書き込む値（例: {1: "○", 2: "△"}）
     column_definitions: 新形式の列定義。指定時は全書き込み列に対応。
+    per_col_answers: 列別回答テキスト（例: {1: {"D": "対応済み", "E": ""}}）
     """
     # column_definitions から書き込み列を動的に決定
     write_cols: list[tuple[str, str]] = []  # [(col_letter, role), ...]
@@ -402,8 +404,8 @@ def write_answers_to_original(
                 write_cols.append((d["col"], d["role"]))
 
     if config.file_format == "docx":
-        return _write_docx_answers(original_path, answers, config, output_path, choices, write_cols)
-    return _write_xlsx_answers(original_path, answers, config, output_path, choices, write_cols)
+        return _write_docx_answers(original_path, answers, config, output_path, choices, write_cols, per_col_answers)
+    return _write_xlsx_answers(original_path, answers, config, output_path, choices, write_cols, per_col_answers)
 
 
 def _write_xlsx_answers(
@@ -413,6 +415,7 @@ def _write_xlsx_answers(
     output_path: Path,
     choices: dict[int, str] | None = None,
     write_cols: list[tuple[str, str]] | None = None,
+    per_col_answers: dict[int, dict[str, str]] | None = None,
 ) -> Path:
     from openpyxl import load_workbook
     from openpyxl.cell.cell import MergedCell
@@ -435,6 +438,9 @@ def _write_xlsx_answers(
         if config.choices_col:
             judgment_cols = [config.choices_col.upper()]
 
+    if per_col_answers is None:
+        per_col_answers = {}
+
     no = 0
     for row_idx in range(config.data_start_row, ws.max_row + 1):
         q_idx = _col_letter_to_index(config.question_col)
@@ -442,12 +448,31 @@ def _write_xlsx_answers(
         if isinstance(q_cell, MergedCell) or not q_cell.value or not str(q_cell.value).strip():
             continue
         no += 1
-        # 回答列に書き込み
-        if no in answers:
-            for a_col in answer_cols:
+        # 回答列に書き込み（ハードゲート付き）
+        mark = choices.get(no, "") if choices else ""
+        col_texts = per_col_answers.get(no)
+        if col_texts or no in answers:
+            for i, a_col in enumerate(answer_cols):
                 cell = ws[f"{a_col}{row_idx}"]
-                if not isinstance(cell, MergedCell):
-                    cell.value = answers[no]
+                if isinstance(cell, MergedCell):
+                    continue
+                # ハードゲート: 複数answer列 + 判定ありの場合、合わない列は必ず空
+                if len(answer_cols) >= 2 and mark:
+                    if mark in ("○", "◎") and i != 0:
+                        cell.value = None
+                        continue
+                    if mark in ("△", "×") and i != 1:
+                        cell.value = None
+                        continue
+                # 列別テキストがあればそちらを優先
+                if col_texts:
+                    cell.value = col_texts.get(a_col) or None
+                elif no in answers:
+                    # △/×で列別テキストがない場合、代替策列はAIで書かない
+                    if len(answer_cols) >= 2 and mark in ("△", "×"):
+                        cell.value = None
+                    else:
+                        cell.value = answers[no]
         # 判定列に書き込み
         if choices and no in choices:
             for j_col in judgment_cols:
@@ -468,6 +493,7 @@ def _write_docx_answers(
     output_path: Path,
     choices: dict[int, str] | None = None,
     write_cols: list[tuple[str, str]] | None = None,
+    per_col_answers: dict[int, dict[str, str]] | None = None,
 ) -> Path:
     from docx import Document
 
@@ -480,18 +506,24 @@ def _write_docx_answers(
 
     # 書き込み先の列インデックスを決定
     answer_idxs: list[int] = []
+    answer_col_letters: list[str] = []
     judgment_idxs: list[int] = []
     if write_cols:
         for col_letter, role in write_cols:
             idx = _col_letter_to_index(col_letter)
             if role == "answer":
                 answer_idxs.append(idx)
+                answer_col_letters.append(col_letter.upper())
             elif role == "judgment":
                 judgment_idxs.append(idx)
     else:
         answer_idxs = [_col_letter_to_index(config.answer_col)]
+        answer_col_letters = [config.answer_col.upper()]
         if config.choices_col:
             judgment_idxs = [_col_letter_to_index(config.choices_col)]
+
+    if per_col_answers is None:
+        per_col_answers = {}
 
     no = 0
     for i, row in enumerate(table.rows):
@@ -504,10 +536,30 @@ def _write_docx_answers(
         if not q_text:
             continue
         no += 1
-        if no in answers:
-            for a_idx in answer_idxs:
-                if a_idx < len(cells):
-                    cells[a_idx].text = answers[no]
+        # 回答列に書き込み（ハードゲート付き）
+        mark = choices.get(no, "") if choices else ""
+        col_texts = per_col_answers.get(no)
+        if col_texts or no in answers:
+            for j, a_idx in enumerate(answer_idxs):
+                if a_idx >= len(cells):
+                    continue
+                # ハードゲート: 複数answer列 + 判定ありの場合、合わない列は必ず空
+                if len(answer_idxs) >= 2 and mark:
+                    if mark in ("○", "◎") and j != 0:
+                        cells[a_idx].text = ""
+                        continue
+                    if mark in ("△", "×") and j != 1:
+                        cells[a_idx].text = ""
+                        continue
+                col_letter = answer_col_letters[j] if j < len(answer_col_letters) else ""
+                if col_texts and col_letter:
+                    cells[a_idx].text = col_texts.get(col_letter) or ""
+                elif no in answers:
+                    # △/×で列別テキストがない場合、代替策列はAIで書かない
+                    if len(answer_idxs) >= 2 and mark in ("△", "×"):
+                        cells[a_idx].text = ""
+                    else:
+                        cells[a_idx].text = answers[no]
         if choices and no in choices:
             for j_idx in judgment_idxs:
                 if j_idx < len(cells):

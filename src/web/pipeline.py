@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import sys
 import threading
 import time
@@ -190,6 +191,7 @@ def _run_session_pipeline_thread(
             format_context = ""
             col_defs_str = session.get("column_definitions", "[]")
             row_struct = session.get("row_structure", "")
+            col_defs = []
             if col_defs_str and col_defs_str != "[]":
                 import json as _json
                 try:
@@ -198,6 +200,7 @@ def _run_session_pipeline_thread(
                     format_context = build_format_context(col_defs, row_struct)
                 except (ValueError, TypeError):
                     pass
+            answer_col_letters = [d["col"] for d in col_defs if d.get("role") == "answer"]
 
             existing_dirs = [d for d in kb_dirs if d.exists()]
             if existing_dirs:
@@ -230,14 +233,25 @@ def _run_session_pipeline_thread(
                         judgment = ans.get("judgment", "")
                         if judgment and judgment in ("○", "△", "×", "◎"):
                             updates["assessment_mark"] = judgment
+                        # 列別テキストを構築（ハードゲート用）
+                        if len(answer_col_letters) >= 2 and judgment:
+                            at = {}
+                            if judgment in ("○", "◎"):
+                                at[answer_col_letters[0]] = ans["answer"]
+                            # △/×の場合: 代替策はAIで書かない（ユーザがStep5で手動入力）
+                            updates["answer_texts"] = json.dumps(at, ensure_ascii=False)
+                        elif answer_col_letters:
+                            updates["answer_texts"] = json.dumps(
+                                {answer_col_letters[0]: ans["answer"]}, ensure_ascii=False)
                         web_db.update_session_question(db_path, session_id, q_no, **updates)
             else:
                 job.progress.append("KBフォルダが見つかりません")
         finally:
             sys.stderr = old_stderr
 
-        # assessment型の場合、○/△/×を自動判定
-        if session.get("format_type") == "assessment" and config.api_key:
+        # ○/△/×を自動判定（複数answer列 or assessment型の場合）
+        has_judgment = len(answer_col_letters) >= 2 or session.get("format_type") == "assessment"
+        if has_judgment and config.api_key:
             job.progress.append("○/△/×判定中...")
             from ..matcher import judge_assessment_marks
             all_qs = web_db.get_session_questions(db_path, session_id)
@@ -247,9 +261,18 @@ def _run_session_pipeline_thread(
                 for q in all_qs
             ]
             marks = judge_assessment_marks(qa_pairs, config.api_key, config.model)
+            # answer_text を mark に応じて answer_texts に振り分け
+            q_map = {q["question_no"]: q for q in all_qs}
             for q_no, mark in marks.items():
-                web_db.update_session_question(db_path, session_id, q_no,
-                                               assessment_mark=mark)
+                upd: dict = {"assessment_mark": mark}
+                q_data = q_map.get(q_no)
+                if q_data and len(answer_col_letters) >= 2:
+                    at = {}
+                    if mark in ("○", "◎"):
+                        at[answer_col_letters[0]] = q_data["answer_text"]
+                    # △/×の場合: 代替策はAIで書かない（ユーザがStep5で手動入力）
+                    upd["answer_texts"] = json.dumps(at, ensure_ascii=False)
+                web_db.update_session_question(db_path, session_id, q_no, **upd)
             job.progress.append(f"判定完了: {len(marks)}件")
 
         web_db.update_session(db_path, session_id, current_step=5, status="completed")

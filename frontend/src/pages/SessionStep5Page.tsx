@@ -17,6 +17,7 @@ type SessionQuestion = {
   confidence: string
   add_to_common: number
   assessment_mark: string
+  answer_texts?: Record<string, string>
   extra_columns?: string
   is_heading?: number
 }
@@ -83,9 +84,10 @@ export default function SessionStep5Page() {
   const [questions, setQuestions] = useState<SessionQuestion[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [accumulated, setAccumulated] = useState(false)
-  const [drafts, setDrafts] = useState<Record<number, string>>({})
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [marks, setMarks] = useState<Record<number, string>>({})
-  const [savedDrafts, setSavedDrafts] = useState<Record<number, string>>({})
+  const [savedDrafts, setSavedDrafts] = useState<Record<string, string>>({})
+  const [savedMarks, setSavedMarks] = useState<Record<number, string>>({})
   const [saving, setSaving] = useState<Record<number, boolean>>({})
   const [colDefs, setColDefs] = useState<ColumnDef[]>([])
 
@@ -95,16 +97,38 @@ export default function SessionStep5Page() {
       const data = await res.json()
       setQuestions(data.questions)
       setStats(data.stats)
-      setColDefs(parseColDefs(data.session?.column_definitions))
-      const initDrafts: Record<number, string> = {}
+      const parsedColDefs = parseColDefs(data.session?.column_definitions)
+      setColDefs(parsedColDefs)
+      const answerCols = parsedColDefs.filter((d) => d.role === "answer")
+      const hasMultiCols = answerCols.length >= 2
+
+      const initDrafts: Record<string, string> = {}
       for (const q of data.questions as SessionQuestion[]) {
         const confident = q.answer_source !== "pending" && q.confidence !== "low"
-        initDrafts[q.question_no] = confident ? q.answer_text : ""
+        const texts = q.answer_texts || {}
+        if (hasMultiCols) {
+          const mark = q.assessment_mark || ""
+          for (let idx = 0; idx < answerCols.length; idx++) {
+            const cd = answerCols[idx]
+            const key = `${q.question_no}_${cd.col}`
+            if (texts[cd.col]) {
+              initDrafts[key] = texts[cd.col]
+            } else if (confident && (mark === "○" || mark === "◎") && idx === 0) {
+              initDrafts[key] = q.answer_text
+            } else {
+              initDrafts[key] = ""
+            }
+          }
+        } else {
+          // 単一列 or レガシー: question_no をキーに
+          const col = answerCols[0]?.col || "_"
+          initDrafts[`${q.question_no}_${col}`] = confident ? q.answer_text : ""
+        }
       }
       setDrafts((prev) => {
         const next = { ...initDrafts }
         for (const [k, v] of Object.entries(prev)) {
-          if (k in next) next[Number(k)] = v
+          if (k in next) next[k] = v
         }
         return next
       })
@@ -115,6 +139,7 @@ export default function SessionStep5Page() {
         initMarks[q.question_no] = q.assessment_mark || ""
       }
       setMarks((prev) => ({ ...initMarks, ...prev }))
+      setSavedMarks(initMarks)
     }
   }, [sessionId])
 
@@ -122,11 +147,51 @@ export default function SessionStep5Page() {
 
   const saveDraft = async (qno: number) => {
     setSaving((prev) => ({ ...prev, [qno]: true }))
+    const answerCols = colDefs.filter((d) => d.role === "answer")
+    const mark = marks[qno] || ""
+
+    if (answerCols.length === 0) {
+      // Legacy mode: no column definitions
+      const legacyKey = `${qno}__`
+      const text = drafts[legacyKey] || ""
+      await apiFetch(`/api/sessions/${sessionId}/questions/${qno}`, {
+        method: "PUT",
+        body: JSON.stringify({ answer_text: text, add_to_common: false }),
+      })
+      setSavedDrafts((prev) => ({ ...prev, [legacyKey]: text }))
+      setSaving((prev) => ({ ...prev, [qno]: false }))
+      return
+    }
+
+    const answer_texts: Record<string, string> = {}
+    for (const cd of answerCols) {
+      answer_texts[cd.col] = drafts[`${qno}_${cd.col}`] || ""
+    }
+    // 判定に応じた primary answer_text を決定
+    let primaryText = ""
+    if (answerCols.length >= 2 && mark) {
+      if (mark === "○" || mark === "◎") primaryText = answer_texts[answerCols[0]?.col] || ""
+      else if (mark === "△" || mark === "×") primaryText = answer_texts[answerCols[1]?.col] || ""
+    } else {
+      primaryText = Object.values(answer_texts).find((t) => t) || ""
+    }
     await apiFetch(`/api/sessions/${sessionId}/questions/${qno}`, {
       method: "PUT",
-      body: JSON.stringify({ answer_text: drafts[qno] || "", add_to_common: false }),
+      body: JSON.stringify({
+        answer_text: primaryText,
+        add_to_common: false,
+        assessment_mark: mark,
+        answer_texts,
+      }),
     })
-    setSavedDrafts((prev) => ({ ...prev, [qno]: drafts[qno] || "" }))
+    // 保存済み状態を更新
+    const updatedSaved: Record<string, string> = {}
+    for (const cd of answerCols) {
+      const key = `${qno}_${cd.col}`
+      updatedSaved[key] = drafts[key] || ""
+    }
+    setSavedDrafts((prev) => ({ ...prev, ...updatedSaved }))
+    setSavedMarks((prev) => ({ ...prev, [qno]: mark }))
     setSaving((prev) => ({ ...prev, [qno]: false }))
   }
 
@@ -253,6 +318,7 @@ export default function SessionStep5Page() {
                         if (mark === "○" && !isFirst) dimmed = true
                         if ((mark === "△" || mark === "×") && isFirst) dimmed = true
                       }
+                      const draftKey = `${q.question_no}_${cd.col}`
                       return (
                       <div key={cd.col} className={`border-t pt-2 ${dimmed ? "opacity-40" : ""}`}>
                         <p className="text-xs font-medium text-muted-foreground mb-1">
@@ -274,23 +340,34 @@ export default function SessionStep5Page() {
                             <option value="×">×</option>
                           </select>
                         ) : (
-                          <div className="flex gap-2 items-start">
-                            <textarea
-                              className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px] resize-y"
-                              value={drafts[q.question_no] ?? ""}
-                              onChange={(e) => setDrafts((prev) => ({ ...prev, [q.question_no]: e.target.value }))}
-                              placeholder="回答を入力してください"
-                            />
-                            <SaveButton
-                              isSaving={!!saving[q.question_no]}
-                              isChanged={(drafts[q.question_no] ?? "") !== (savedDrafts[q.question_no] ?? "")}
-                              onSave={() => saveDraft(q.question_no)}
-                            />
-                          </div>
+                          <textarea
+                            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px] resize-y"
+                            value={drafts[draftKey] ?? ""}
+                            onChange={(e) => setDrafts((prev) => ({ ...prev, [draftKey]: e.target.value }))}
+                            placeholder="回答を入力してください"
+                          />
                         )}
                       </div>
                       )
                     })}
+                    {/* Save button for all write columns */}
+                    {(() => {
+                      const answerColsOnly = writeCols.filter((w) => w.role === "answer")
+                      const textsChanged = answerColsOnly.some((c) => {
+                        const key = `${q.question_no}_${c.col}`
+                        return (drafts[key] ?? "") !== (savedDrafts[key] ?? "")
+                      })
+                      const markChanged = (marks[q.question_no] || "") !== (savedMarks[q.question_no] || "")
+                      return (
+                        <div className="flex justify-end">
+                          <SaveButton
+                            isSaving={!!saving[q.question_no]}
+                            isChanged={textsChanged || markChanged}
+                            onSave={() => saveDraft(q.question_no)}
+                          />
+                        </div>
+                      )
+                    })()}
                   </>
                 ) : (
                   <>
@@ -304,13 +381,13 @@ export default function SessionStep5Page() {
                       <div className="flex gap-2 items-start">
                         <textarea
                           className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[60px] resize-y"
-                          value={drafts[q.question_no] ?? ""}
-                          onChange={(e) => setDrafts((prev) => ({ ...prev, [q.question_no]: e.target.value }))}
+                          value={drafts[`${q.question_no}__`] ?? ""}
+                          onChange={(e) => setDrafts((prev) => ({ ...prev, [`${q.question_no}__`]: e.target.value }))}
                           placeholder="回答を入力してください"
                         />
                         <SaveButton
                           isSaving={!!saving[q.question_no]}
-                          isChanged={(drafts[q.question_no] ?? "") !== (savedDrafts[q.question_no] ?? "")}
+                          isChanged={(drafts[`${q.question_no}__`] ?? "") !== (savedDrafts[`${q.question_no}__`] ?? "")}
                           onSave={() => saveDraft(q.question_no)}
                         />
                       </div>

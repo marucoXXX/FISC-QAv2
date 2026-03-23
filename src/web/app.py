@@ -8,7 +8,7 @@ import shutil
 import tempfile
 from io import BytesIO
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -86,6 +86,8 @@ class ConfirmItem(BaseModel):
 class QuestionEdit(BaseModel):
     answer_text: str
     add_to_common: bool = False
+    assessment_mark: Optional[str] = None
+    answer_texts: Optional[Dict[str, str]] = None
 
 class ConfigUpdate(BaseModel):
     kb_dir: Optional[str] = None
@@ -802,6 +804,10 @@ def create_router(
     @router.put("/api/sessions/{session_id}/questions/{question_no}")
     def edit_question_answer(session_id: int, question_no: int, req: QuestionEdit) -> dict:
         updates = {"answer_text": req.answer_text, "add_to_common": 1 if req.add_to_common else 0}
+        if req.assessment_mark is not None:
+            updates["assessment_mark"] = req.assessment_mark
+        if req.answer_texts is not None:
+            updates["answer_texts"] = json.dumps(req.answer_texts, ensure_ascii=False)
         q = None
         for sq in db.get_session_questions(db_path, session_id):
             if sq["question_no"] == question_no:
@@ -855,9 +861,30 @@ def create_router(
         # assessment型の場合、○/△/×をchoices_colに書き込む
         choices = None
         fmt_type = session.get("format_type") or "freetext"
-        if fmt_type == "assessment" and session.get("choices_col"):
+        # column_definitions があれば judgment 列からも choices を構築
+        col_defs_raw = session.get("column_definitions", "[]")
+        col_defs_parsed = []
+        if col_defs_raw and col_defs_raw != "[]":
+            try:
+                col_defs_parsed = json.loads(col_defs_raw)
+            except (ValueError, TypeError):
+                pass
+        has_judgment_col = any(d.get("role") == "judgment" for d in col_defs_parsed)
+        if has_judgment_col or (fmt_type == "assessment" and session.get("choices_col")):
             choices = {q["question_no"]: q["assessment_mark"]
                        for q in questions if q.get("assessment_mark")}
+
+        # 列別テキストを構築
+        per_col_answers = {}
+        for q in questions:
+            texts = q.get("answer_texts")
+            if isinstance(texts, str):
+                try:
+                    texts = json.loads(texts)
+                except (ValueError, TypeError):
+                    texts = {}
+            if texts:
+                per_col_answers[q["question_no"]] = texts
 
         source_path = Path(session.get("source_file_path", ""))
         if source_path.exists():
@@ -878,17 +905,11 @@ def create_router(
             output_dir.mkdir(parents=True, exist_ok=True)
             ext = ".docx" if (session["file_format"] or "xlsx") == "docx" else ".xlsx"
             output_path = output_dir / f"FISC回答_{session_id}{ext}"
-            # column_definitions をパースしてエクスポートに渡す
-            col_defs_for_export = None
-            col_defs_raw = session.get("column_definitions", "[]")
-            if col_defs_raw and col_defs_raw != "[]":
-                try:
-                    col_defs_for_export = json.loads(col_defs_raw)
-                except (ValueError, TypeError):
-                    pass
+            col_defs_for_export = col_defs_parsed or None
             write_answers_to_original(
                 source_path, answers, fc, output_path,
                 choices=choices, column_definitions=col_defs_for_export,
+                per_col_answers=per_col_answers or None,
             )
 
             media = (

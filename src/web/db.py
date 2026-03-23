@@ -187,6 +187,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         ("bank_qa_files", "heading_pattern", "TEXT NOT NULL DEFAULT ''"),
         ("session_questions", "extra_columns", "TEXT NOT NULL DEFAULT '{}'"),
         ("session_questions", "is_heading", "INTEGER NOT NULL DEFAULT 0"),
+        ("session_questions", "answer_texts", "TEXT NOT NULL DEFAULT '{}'"),
     ]
     for table, col, col_def in migrations:
         try:
@@ -744,6 +745,7 @@ def get_session_questions(
     for r in rows:
         d = dict(r)
         d["source_references"] = json.loads(d["source_references"])
+        d["answer_texts"] = json.loads(d.get("answer_texts") or "{}")
         results.append(d)
     return results
 
@@ -752,7 +754,7 @@ def update_session_question(db_path: Path, session_id: int, question_no: int, **
     allowed = {
         "answer_source", "answer_text", "source_references", "confidence",
         "matched_past_qa_id", "past_question_text", "past_answer_text",
-        "match_judgment", "match_reason", "assessment_mark",
+        "match_judgment", "match_reason", "assessment_mark", "answer_texts",
         "matched_common_id", "common_answer_text",
         "user_confirmed", "step_resolved", "add_to_common",
     }
