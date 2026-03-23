@@ -12,6 +12,7 @@ import SessionStep3Page from "@/pages/SessionStep3Page"
 import SessionStep4Page from "@/pages/SessionStep4Page"
 import SessionStep5Page from "@/pages/SessionStep5Page"
 import KbFoldersPage from "@/pages/KbFoldersPage"
+import FormatAnalyzePage from "@/pages/FormatAnalyzePage"
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -55,6 +56,7 @@ function AppRoutes() {
       <Route path="/welcome" element={<P title="Welcome"><WelcomePage /></P>} />
       <Route path="/banks" element={<P title="金融機関・アンケート管理"><BankListPage /></P>} />
       <Route path="/banks/:bankId" element={<P title="金融機関詳細"><BankDetailPage /></P>} />
+      <Route path="/banks/:bankId/format-setup" element={<P title="フォーマット分析"><FormatAnalyzePage /></P>} />
       <Route path="/common-answers" element={<P title="共通回答DB管理"><CommonAnswersPage /></P>} />
       <Route path="/kb-folders" element={<P title="システム別ナレッジDB管理"><KbFoldersPage /></P>} />
       <Route path="/sessions" element={<P title="ワークフロー"><SessionListPage /></P>} />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import { Upload } from "lucide-react"
 import { apiFetch } from "@/lib/httpClient"
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,7 @@ export default function SessionNewPage() {
   const [banks, setBanks] = useState<Bank[]>([])
   const [bankId, setBankId] = useState<number | "">("")
   const [qaFiles, setQaFiles] = useState<QaFile[]>([])
+  const [qaFilesLoaded, setQaFilesLoaded] = useState(false)
   const [qaFileId, setQaFileId] = useState<number | "">("")
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
@@ -39,14 +40,17 @@ export default function SessionNewPage() {
     if (!bankId) {
       setQaFiles([])
       setQaFileId("")
+      setQaFilesLoaded(false)
       return
     }
+    setQaFilesLoaded(false)
     apiFetch(`/api/banks/${bankId}/qa-files`).then(async (res) => {
       if (res.ok) {
         const files = await res.json()
         setQaFiles(files)
         setQaFileId(files.length === 1 ? files[0].id : "")
       }
+      setQaFilesLoaded(true)
     })
   }, [bankId])
 
@@ -95,6 +99,19 @@ export default function SessionNewPage() {
           </select>
         </div>
 
+        {bankId && qaFilesLoaded && qaFiles.length === 0 && (
+          <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4 space-y-3">
+            <p className="text-sm text-yellow-800">
+              この銀行にはQAファイル設定がありません。ワークフローを開始するには先にフォーマット設定を完了してください。
+            </p>
+            <Link to={`/banks/${bankId}/format-setup`}>
+              <Button variant="outline" size="sm">
+                フォーマット設定へ
+              </Button>
+            </Link>
+          </div>
+        )}
+
         {bankId && qaFiles.length > 0 && (
           <div className="space-y-2">
             <Label>金融機関から受領したアンケートを選択</Label>
@@ -118,44 +135,48 @@ export default function SessionNewPage() {
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label>質問票ファイル</Label>
-          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.docx"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="hidden"
-            />
-            {file ? (
-              <div className="space-y-2">
-                <p className="font-medium">{file.name}</p>
-                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  変更
-                </Button>
+        {(!bankId || qaFiles.length > 0) && (
+          <>
+            <div className="space-y-2">
+              <Label>質問票ファイル</Label>
+              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.docx"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                {file ? (
+                  <div className="space-y-2">
+                    <p className="font-medium">{file.name}</p>
+                    <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                      変更
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">質問票ファイルをアップロード</p>
+                    <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                      ファイルを選択
+                    </Button>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="space-y-2">
-                <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">質問票ファイルをアップロード</p>
-                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  ファイルを選択
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <Button
-          onClick={handleSubmit}
-          disabled={!bankId || !file || loading}
-          className="w-full"
-        >
-          {loading ? "処理中..." : "質問を抽出してStep2へ進む"}
-        </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={!bankId || !file || loading}
+              className="w-full"
+            >
+              {loading ? "処理中..." : "質問を抽出してStep2へ進む"}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   )

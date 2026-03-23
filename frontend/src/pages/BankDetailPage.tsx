@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react"
-import { useParams, Link } from "react-router-dom"
+import { useParams, Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Upload, Trash2, Search, Plus, Pencil } from "lucide-react"
 import { apiFetch } from "@/lib/httpClient"
 import { Button } from "@/components/ui/button"
@@ -82,6 +82,7 @@ const INITIAL_QF_FORM = {
 
 export default function BankDetailPage() {
   const { bankId } = useParams<{ bankId: string }>()
+  const navigate = useNavigate()
   const [bank, setBank] = useState<Bank | null>(null)
   const [qaFiles, setQaFiles] = useState<QaFile[]>([])
   const [pastQAs, setPastQAs] = useState<PastQA[]>([])
@@ -218,10 +219,18 @@ export default function BankDetailPage() {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">QAファイル ({qaFiles.length}件)</CardTitle>
-            <Button onClick={openCreateQf} size="sm" variant="outline">
-              <Plus className="h-3 w-3 mr-1" />
-              追加
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => navigate(`/banks/${bankId}/format-setup`)} size="sm" variant="outline">
+                <Plus className="h-3 w-3 mr-1" />
+                追加
+              </Button>
+              <button
+                onClick={openCreateQf}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                手動で追加
+              </button>
+            </div>
           </div>
           <CardDescription>銀行名 + QAファイル名で一意。ファイルごとにフォーマット設定を管理します。</CardDescription>
         </CardHeader>

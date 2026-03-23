@@ -181,6 +181,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         ("session_questions", "match_judgment", "TEXT NOT NULL DEFAULT ''"),
         ("session_questions", "match_reason", "TEXT NOT NULL DEFAULT ''"),
         ("session_questions", "assessment_mark", "TEXT NOT NULL DEFAULT ''"),
+        ("bank_qa_files", "analysis_confirmed", "INTEGER NOT NULL DEFAULT 0"),
     ]
     for table, col, col_def in migrations:
         try:
@@ -463,18 +464,19 @@ def create_bank_qa_file(
     format_type: str = "freetext",
     choices_col: str = "",
     remarks_col: str = "",
+    analysis_confirmed: int = 0,
 ) -> int:
     now = datetime.now().isoformat()
     with get_conn(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO bank_qa_files (bank_id, qa_file_name, file_format, "
             "question_col, answer_col, header_row, data_start_row, table_index, "
-            "format_type, choices_col, remarks_col, "
+            "format_type, choices_col, remarks_col, analysis_confirmed, "
             "created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (bank_id, qa_file_name, file_format, question_col, answer_col,
              header_row, data_start_row, table_index,
-             format_type, choices_col, remarks_col, now, now),
+             format_type, choices_col, remarks_col, analysis_confirmed, now, now),
         )
         return cur.lastrowid
 

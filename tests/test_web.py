@@ -478,19 +478,37 @@ def _make_past_answer_excel(qa_pairs: list[tuple[str, str]]):
     return buf.getvalue()
 
 
+def _create_bank_with_qa_file(client, name, code):
+    """Create a bank + QA file config (required for hard gate)."""
+    bid = client.post("/api/banks", json={"name": name, "code": code}).json()["id"]
+    client.post(f"/api/banks/{bid}/qa-files", json={
+        "qa_file_name": "テスト", "file_format": "xlsx",
+        "question_col": "D", "answer_col": "E",
+        "header_row": 1, "data_start_row": 2,
+    })
+    return bid
+
+
 # --- Fixtures ---
 
 
 @pytest.fixture
 def bank_id(client):
-    """Create a test bank and return its id."""
+    """Create a test bank with a QA file config and return the bank id."""
     res = client.post("/api/banks", json={
         "name": "テスト銀行", "code": "TEST01",
         "file_format": "xlsx", "question_col": "D", "answer_col": "E",
         "header_row": 1, "data_start_row": 2,
     })
     assert res.status_code == 200
-    return res.json()["id"]
+    bid = res.json()["id"]
+    # QAファイル設定を作成（ハードゲート対応）
+    client.post(f"/api/banks/{bid}/qa-files", json={
+        "qa_file_name": "テスト質問票", "file_format": "xlsx",
+        "question_col": "D", "answer_col": "E",
+        "header_row": 1, "data_start_row": 2,
+    })
+    return bid
 
 
 @pytest.fixture
@@ -918,6 +936,11 @@ def test_api_step4_generate(mock_pipeline, client, session_with_past_match):
 def test_api_step4_generate_skip(client):
     """When all questions are resolved, Step4 should skip generation."""
     bank_id = client.post("/api/banks", json={"name": "全解決銀行", "code": "SKIP01"}).json()["id"]
+    client.post(f"/api/banks/{bank_id}/qa-files", json={
+        "qa_file_name": "テスト", "file_format": "xlsx",
+        "question_col": "D", "answer_col": "E",
+        "header_row": 1, "data_start_row": 2,
+    })
 
     # Upload past answers matching ALL questions
     qs = ["MFAの導入状況は？", "RPOの設定は？"]
@@ -1078,10 +1101,7 @@ def test_api_export_session_fallback(client, session_id, tmp_db):
 
 def test_workflow_step1_to_step2(client):
     """Bank creation → past QA upload → session creation → Step2 match."""
-    # Step1: Create bank
-    bank_id = client.post("/api/banks", json={
-        "name": "ワークフロー銀行", "code": "WF01",
-    }).json()["id"]
+    bank_id = _create_bank_with_qa_file(client, "ワークフロー銀行", "WF01")
 
     # Upload past answers
     content = _make_past_answer_excel([
@@ -1105,7 +1125,7 @@ def test_workflow_step1_to_step2(client):
 @patch("litellm.completion")
 def test_workflow_step2_to_step3(mock_completion, client):
     """Step2 confirm → Step3 LLM matching on unresolved only."""
-    bank_id = client.post("/api/banks", json={"name": "WF2銀行", "code": "WF02"}).json()["id"]
+    bank_id = _create_bank_with_qa_file(client, "WF2銀行", "WF02")
 
     content = _make_past_answer_excel([("MFAの導入状況は？", "導入済み")])
     client.post(f"/api/banks/{bank_id}/past-answers/upload",
@@ -1149,7 +1169,7 @@ def test_workflow_step2_to_step3(mock_completion, client):
 
 def test_workflow_full_past_reuse(client):
     """All questions resolved at Step2 → Step3/4 skipped → Step5 summary shows all past_match."""
-    bank_id = client.post("/api/banks", json={"name": "全件マッチ", "code": "FM01"}).json()["id"]
+    bank_id = _create_bank_with_qa_file(client, "全件マッチ", "FM01")
 
     qs = ["MFAの導入状況は？", "RPOの設定は？"]
     content = _make_past_answer_excel([(q, f"回答:{q}") for q in qs])
@@ -1183,7 +1203,7 @@ def test_workflow_full_past_reuse(client):
 
 def test_workflow_finalize_and_reuse(client, tmp_db):
     """Finalize → new session with same bank → past_qa accumulated → Step2 matches."""
-    bank_id = client.post("/api/banks", json={"name": "蓄積テスト", "code": "ACC01"}).json()["id"]
+    bank_id = _create_bank_with_qa_file(client, "蓄積テスト", "ACC01")
 
     # First session with manual answers
     q_content = _make_questionnaire_excel(questions=["テスト質問1"])
@@ -1205,7 +1225,7 @@ def test_workflow_finalize_and_reuse(client, tmp_db):
 
 def test_workflow_export_has_answers(client, tmp_db):
     """Finalize → export contains answers."""
-    bank_id = client.post("/api/banks", json={"name": "エクスポート", "code": "EXP01"}).json()["id"]
+    bank_id = _create_bank_with_qa_file(client, "エクスポート", "EXP01")
 
     q_content = _make_questionnaire_excel(questions=["質問A"])
     sid = client.post(f"/api/sessions?bank_id={bank_id}",
@@ -1388,7 +1408,8 @@ def test_api_list_bank_qa_files(client, bank_id):
     client.post(f"/api/banks/{bank_id}/qa-files", json={"qa_file_name": "シートY"})
     res = client.get(f"/api/banks/{bank_id}/qa-files")
     assert res.status_code == 200
-    assert len(res.json()) == 2
+    # bank_id fixture creates 1 QA file + 2 added here = 3
+    assert len(res.json()) == 3
 
 
 def test_api_delete_bank_qa_file(client, bank_id):

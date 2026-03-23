@@ -102,6 +102,21 @@ class KbFolderUpdate(BaseModel):
     label: Optional[str] = None
 
 
+def _cleanup_old_analyze_dirs() -> None:
+    """24時間超の analyze_* 一時ディレクトリを削除."""
+    import time
+    if not UPLOAD_DIR.exists():
+        return
+    cutoff = time.time() - 86400
+    for d in UPLOAD_DIR.iterdir():
+        if d.is_dir() and d.name.startswith("analyze_"):
+            try:
+                if d.stat().st_mtime < cutoff:
+                    shutil.rmtree(d, ignore_errors=True)
+            except OSError:
+                pass
+
+
 def create_router(
     db_path: Path,
     config: Config,
@@ -192,6 +207,168 @@ def create_router(
         if not ok:
             raise HTTPException(404)
         return {"ok": True}
+
+    # --- Format Analysis API ---
+
+    @router.post("/api/banks/{bank_id}/qa-files/analyze")
+    async def analyze_qa_file(bank_id: int, file: UploadFile = ...) -> dict:
+        bank = db.get_bank(db_path, bank_id)
+        if not bank:
+            raise HTTPException(404, "銀行が見つかりません")
+        if not file.filename:
+            raise HTTPException(400, "ファイル名がありません")
+
+        from ..format_analyzer import extract_preview, analyze_format
+        import time
+
+        content = await file.read()
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "xlsx"
+        file_format = "docx" if ext == "docx" else "xlsx"
+
+        # 一時ファイル保存
+        temp_id = f"analyze_{bank_id}_{int(time.time())}"
+        temp_dir = UPLOAD_DIR / temp_id
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        stored_path = temp_dir / file.filename
+        stored_path.write_bytes(content)
+
+        # 古い分析ファイルのクリーンアップ (24時間超)
+        _cleanup_old_analyze_dirs()
+
+        preview = extract_preview(stored_path, file_format)
+        suggestion = analyze_format(preview, config.model, config.api_key)
+
+        return {
+            "preview": preview,
+            "suggestion": suggestion,
+            "temp_file_id": temp_id,
+            "file_name": file.filename,
+            "file_format": file_format,
+        }
+
+    @router.post("/api/banks/{bank_id}/qa-files/analyze/preview")
+    def analyze_preview(bank_id: int, req: dict) -> dict:
+        temp_file_id = req.get("temp_file_id", "")
+        temp_dir = UPLOAD_DIR / temp_file_id
+        if not temp_dir.exists():
+            raise HTTPException(404, "一時ファイルが見つかりません")
+
+        files = list(temp_dir.iterdir())
+        if not files:
+            raise HTTPException(404, "一時ファイルが見つかりません")
+        stored_path = files[0]
+
+        from ..file_io import FormatConfig, read_questionnaire
+
+        fc = FormatConfig(
+            file_format=req.get("file_format", "xlsx"),
+            question_col=req.get("question_col", "D"),
+            answer_col=req.get("answer_col", "E"),
+            header_row=req.get("header_row", 1),
+            data_start_row=req.get("data_start_row", 2),
+            table_index=req.get("table_index", 0),
+            format_type=req.get("format_type", "freetext"),
+            choices_col=req.get("choices_col", ""),
+            remarks_col=req.get("remarks_col", ""),
+        )
+        questions = read_questionnaire(stored_path, fc)
+        sample = [
+            {
+                "question_no": q.question_no,
+                "question_text": q.question_text,
+                "major": q.major,
+                "minor": q.minor,
+                "choices_text": q.choices_text,
+                "remarks_text": q.remarks_text,
+            }
+            for q in questions[:5]
+        ]
+        return {"sample_questions": sample, "total_count": len(questions)}
+
+    @router.post("/api/banks/{bank_id}/qa-files/analyze/columns")
+    def analyze_columns_endpoint(bank_id: int, req: dict) -> dict:
+        temp_file_id = req.get("temp_file_id", "")
+        temp_dir = UPLOAD_DIR / temp_file_id
+        if not temp_dir.exists():
+            raise HTTPException(404, "一時ファイルが見つかりません")
+
+        files = list(temp_dir.iterdir())
+        if not files:
+            raise HTTPException(404, "一時ファイルが見つかりません")
+
+        from ..format_analyzer import extract_preview, analyze_columns
+
+        file_format = req.get("file_format", "xlsx")
+        table_index = req.get("table_index", 0)
+        preview = extract_preview(files[0], file_format, table_index=table_index)
+        result = analyze_columns(
+            preview,
+            header_row=req.get("header_row", 1),
+            data_start_row=req.get("data_start_row", 2),
+            format_type=req.get("format_type", "freetext"),
+            model=config.model,
+            api_key=config.api_key,
+            user_hint=req.get("user_hint", ""),
+        )
+        return result
+
+    @router.post("/api/banks/{bank_id}/qa-files/confirm")
+    def confirm_qa_file(bank_id: int, req: dict) -> dict:
+        bank = db.get_bank(db_path, bank_id)
+        if not bank:
+            raise HTTPException(404, "銀行が見つかりません")
+
+        qa_file_name = req.get("qa_file_name", "")
+        if not qa_file_name:
+            raise HTTPException(400, "QAファイル名を指定してください")
+
+        try:
+            qa_file_id = db.create_bank_qa_file(
+                db_path, bank_id, qa_file_name,
+                file_format=req.get("file_format", "xlsx"),
+                question_col=req.get("question_col", "D"),
+                answer_col=req.get("answer_col", "E"),
+                header_row=req.get("header_row", 1),
+                data_start_row=req.get("data_start_row", 2),
+                table_index=req.get("table_index", 0),
+                format_type=req.get("format_type", "freetext"),
+                choices_col=req.get("choices_col", ""),
+                remarks_col=req.get("remarks_col", ""),
+                analysis_confirmed=1,
+            )
+        except Exception as e:
+            if "UNIQUE" in str(e):
+                raise HTTPException(409, "同じ銀行に同名のQAファイルが既に存在します")
+            raise
+
+        # 試行抽出
+        sample_questions: list = []
+        temp_file_id = req.get("temp_file_id", "")
+        if temp_file_id:
+            temp_dir = UPLOAD_DIR / temp_file_id
+            if temp_dir.exists():
+                files = list(temp_dir.iterdir())
+                if files:
+                    from ..file_io import FormatConfig, read_questionnaire
+                    fc = FormatConfig(
+                        file_format=req.get("file_format", "xlsx"),
+                        question_col=req.get("question_col", "D"),
+                        answer_col=req.get("answer_col", "E"),
+                        header_row=req.get("header_row", 1),
+                        data_start_row=req.get("data_start_row", 2),
+                        table_index=req.get("table_index", 0),
+                        format_type=req.get("format_type", "freetext"),
+                        choices_col=req.get("choices_col", ""),
+                        remarks_col=req.get("remarks_col", ""),
+                    )
+                    questions = read_questionnaire(files[0], fc)
+                    sample_questions = [
+                        {"question_no": q.question_no, "question_text": q.question_text,
+                         "major": q.major, "minor": q.minor}
+                        for q in questions[:5]
+                    ]
+
+        return {"id": qa_file_id, "sample_questions": sample_questions}
 
     # --- Past QA API ---
 
@@ -287,12 +464,24 @@ def create_router(
         if not bank:
             raise HTTPException(404, "銀行が見つかりません")
 
+        # Hard gate: QAファイル設定が必要
+        existing_qa_files = db.list_bank_qa_files(db_path, bank_id)
+        if not existing_qa_files:
+            raise HTTPException(
+                400,
+                "この銀行にはQAファイル設定がありません。"
+                "ワークフローを開始するには先にフォーマット設定を完了してください。",
+            )
+
         # Get format config from QA file
         qf = None
         if qa_file_id:
             qf = db.get_bank_qa_file(db_path, qa_file_id)
             if not qf:
                 raise HTTPException(404, "QAファイルが見つかりません")
+        else:
+            # qa_file_id未指定の場合、最初のQAファイルを使用
+            qf = existing_qa_files[0]
 
         if not file.filename:
             raise HTTPException(400, "ファイル名がありません")
