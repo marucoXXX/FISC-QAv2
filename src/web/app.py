@@ -316,18 +316,33 @@ def create_router(
             raise HTTPException(404, "一時ファイルが見つかりません")
 
         from ..format_analyzer import extract_preview, analyze_columns
+        from ..file_io import detect_headings_in_preview
 
         file_format = req.get("file_format", "xlsx")
         table_index = req.get("table_index", 0)
+        header_row = req.get("header_row", 1)
+        data_start_row = req.get("data_start_row", 2)
         preview = extract_preview(files[0], file_format, table_index=table_index)
         result = analyze_columns(
             preview,
-            header_row=req.get("header_row", 1),
-            data_start_row=req.get("data_start_row", 2),
+            header_row=header_row,
+            data_start_row=data_start_row,
             model=config.model,
             api_key=config.api_key,
             user_hint=req.get("user_hint", ""),
         )
+
+        # 見出し行検出をプレビューに適用
+        col_defs = result.get("column_definitions", [])
+        q_col = next((d["col"] for d in col_defs if d.get("role") == "question"), "A")
+        detected = detect_headings_in_preview(
+            preview, header_row, data_start_row,
+            column_definitions=col_defs,
+            heading_pattern=result.get("heading_pattern", ""),
+            question_col=q_col,
+        )
+        result["detected_headings"] = detected
+
         return result
 
     @router.post("/api/banks/{bank_id}/qa-files/confirm")

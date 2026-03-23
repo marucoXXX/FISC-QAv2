@@ -124,6 +124,7 @@ export default function FormatAnalyzePage() {
   const [columnDefs, setColumnDefs] = useState<ColumnDef[]>([])
   const [rowStructure, setRowStructure] = useState("")
   const [headingPattern, setHeadingPattern] = useState("")
+  const [detectedHeadings, setDetectedHeadings] = useState<{row_num: number; text: string; reason: string}[]>([])
 
   // Word
   const [selectedTableIndex, setSelectedTableIndex] = useState(0)
@@ -225,6 +226,7 @@ export default function FormatAnalyzePage() {
       setColumnDefs(data.column_definitions || [])
       setRowStructure(data.row_structure || "")
       setHeadingPattern(data.heading_pattern || "")
+      setDetectedHeadings(data.detected_headings || [])
       setStep("columns")
     } finally {
       setAnalyzingColumns(false)
@@ -537,6 +539,25 @@ export default function FormatAnalyzePage() {
                 <p className="text-xs text-muted-foreground mt-1">
                   見出し行がない場合は空欄のままで構いません。
                 </p>
+              )}
+              {detectedHeadings.length > 0 && (
+                <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs font-medium text-amber-800 mb-2">
+                    検出された見出し行 ({detectedHeadings.length}件)
+                  </p>
+                  <div className="space-y-1">
+                    {detectedHeadings.map((h) => (
+                      <div key={h.row_num} className="text-xs flex gap-2">
+                        <span className="text-amber-600 shrink-0">行{h.row_num}:</span>
+                        <span className="font-medium">「{h.text}」</span>
+                        <span className="text-muted-foreground">— {h.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    これらの行はワークフローで「見出し行」として扱われ、回答の対象外になります。
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>

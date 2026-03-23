@@ -166,6 +166,66 @@ def _detect_heading(q: Question, heading_pattern: str, number_col_idx: int = -1,
     return False
 
 
+def detect_headings_in_preview(
+    preview: dict,
+    header_row: int,
+    data_start_row: int,
+    column_definitions: list | None = None,
+    heading_pattern: str = "",
+    question_col: str = "A",
+) -> list:
+    """プレビューデータに対して見出し行検出ルールを適用し、検出結果を返す。"""
+    import re as _re
+
+    q_idx = _col_letter_to_index(question_col)
+    number_col_idx = -1
+    if column_definitions:
+        for d in column_definitions:
+            if d.get("role") == "number":
+                number_col_idx = _col_letter_to_index(d["col"])
+                break
+
+    detected = []
+    for row_data in preview.get("rows", []):
+        row_num = row_data["row_num"]
+        if row_num < data_start_row:
+            continue
+        cells = row_data["cells"]
+        if q_idx >= len(cells):
+            continue
+        text = (cells[q_idx] or "").strip()
+        if not text:
+            continue
+
+        reasons = []
+
+        # ルール1: 全列同一値（結合セル）
+        non_empty = [c.strip() for c in cells if c.strip()]
+        if len(non_empty) >= 2 and all(v == non_empty[0] for v in non_empty):
+            reasons.append("全列同一値（結合セル）")
+
+        # ルール2: 【】で囲まれたテキスト
+        if _re.match(r"^【.+】$", text):
+            reasons.append("【】囲み")
+
+        # ルール3: 番号列が空＋他列もほぼ空
+        if number_col_idx >= 0 and number_col_idx < len(cells):
+            num_val = (cells[number_col_idx] or "").strip()
+            if not num_val:
+                non_empty_count = sum(1 for c in cells if c.strip())
+                if non_empty_count <= 1:
+                    reasons.append("番号列が空")
+
+        if reasons:
+            detected.append({
+                "row_num": row_num,
+                "text": text[:60],
+                "reason": " + ".join(reasons),
+            })
+
+    return detected
+
+
 def read_questionnaire(
     path: Path,
     config: FormatConfig,
