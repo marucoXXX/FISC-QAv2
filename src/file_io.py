@@ -123,30 +123,45 @@ def _col_letter_to_index(col: str) -> int:
 
 
 def _detect_heading(q: Question, heading_pattern: str, number_col_idx: int = -1, row_values: tuple = ()) -> bool:
-    """heading_pattern に基づいて見出し行かどうかを判定する簡易ルールエンジン."""
-    if not heading_pattern:
-        return False
-    pat = heading_pattern.lower()
-    text = q.question_text
+    """見出し行かどうかを複合ルールで判定する。
 
-    # ルール: 番号列が空
-    if ("番号" in pat and "空" in pat) or ("number" in pat and "empty" in pat):
-        if number_col_idx >= 0 and number_col_idx < len(row_values):
-            num_val = str(row_values[number_col_idx] or "").strip()
-            if not num_val and text:
+    heading_pattern テキストに依存せず、構造ルールを常に適用:
+    1. 全列同一値ルール: 行内の全セル（2列以上）が同じテキスト → 見出し行（結合セル）
+    2. 【】ルール: テキストが【...】で囲まれている → 見出し行
+    3. 番号列空ルール: number列が空で question列にテキストがある → 見出し行候補
+    """
+    import re
+    text = q.question_text.strip()
+    if not text:
+        return False
+
+    # ルール1: 全列同一値（結合セルの特徴）
+    if len(row_values) >= 2:
+        non_empty = [str(v or "").strip() for v in row_values if str(v or "").strip()]
+        if non_empty and all(v == non_empty[0] for v in non_empty):
+            return True
+
+    # ルール2: 【】で囲まれたテキスト
+    if re.match(r"^【.+】$", text):
+        return True
+
+    # ルール3: 番号列が空で質問列にテキストがある
+    if number_col_idx >= 0 and number_col_idx < len(row_values):
+        num_val = str(row_values[number_col_idx] or "").strip()
+        if not num_val:
+            # 他の列（質問列以外）がほぼ空ならば見出し行
+            non_empty_count = sum(1 for v in row_values if str(v or "").strip())
+            if non_empty_count <= 1:
                 return True
 
-    # ルール: 【】で囲まれた
-    if "【" in pat or "brackets" in pat:
-        import re
-        if re.match(r"^【.+】$", text.strip()):
-            return True
-
-    # ルール: 質問列にのみテキスト（他の列が空）
-    if "のみ" in pat or "only" in pat:
-        non_empty_count = sum(1 for v in row_values if str(v or "").strip())
-        if non_empty_count <= 2 and text:  # question + maybe one more
-            return True
+    # heading_pattern テキストのキーワードマッチ（追加ルール）
+    if heading_pattern:
+        pat = heading_pattern.lower()
+        if ("番号" in pat and "空" in pat) or ("number" in pat and "empty" in pat):
+            if number_col_idx >= 0 and number_col_idx < len(row_values):
+                num_val = str(row_values[number_col_idx] or "").strip()
+                if not num_val and text:
+                    return True
 
     return False
 
