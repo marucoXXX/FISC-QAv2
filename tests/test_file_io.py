@@ -160,3 +160,139 @@ class TestWriteDocx:
         table = doc.tables[0]
         assert table.rows[1].cells[4].text == "導入済み"
         assert table.rows[2].cells[4].text == "4時間"
+
+
+def _make_xlsx_multi_col(tmp_path: Path) -> Path:
+    """Create xlsx with columns A-F: No, Cat, Sub, Question, Answer1, Answer2."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["No.", "分類", "小分類", "質問", "対応状況", "代替策"])
+    ws.append([1, "セキュリティ", "認証", "MFA導入は？", "", ""])
+    ws.append([2, "バックアップ", "RPO", "RPOは？", "", ""])
+    path = tmp_path / "multi_col.xlsx"
+    wb.save(str(path))
+    wb.close()
+    return path
+
+
+class TestWriteXlsxNoFallback:
+    """Fix 1: column_definitions 使用時に answer_text へのフォールバックが起きないことを検証."""
+
+    def test_write_xlsx_no_fallback_with_col_defs(self, tmp_path):
+        """per_col_answers のテキストのみが出力され、answers dict は使われない."""
+        path = _make_xlsx_multi_col(tmp_path)
+        fc = FormatConfig(file_format="xlsx", question_col="D", answer_col="E",
+                          header_row=1, data_start_row=2)
+        col_defs = [
+            {"col": "D", "role": "question"},
+            {"col": "E", "role": "answer"},
+            {"col": "F", "role": "answer"},
+        ]
+        answers = {1: "fallback text", 2: "fallback text"}
+        per_col = {1: {"E": "correct E", "F": "correct F"}, 2: {"E": "correct E2"}}
+        output = tmp_path / "out.xlsx"
+
+        write_answers_to_original(path, answers, fc, output,
+                                  column_definitions=col_defs, per_col_answers=per_col)
+
+        from openpyxl import load_workbook
+        wb = load_workbook(str(output))
+        ws = wb.active
+        assert ws["E2"].value == "correct E"
+        assert ws["F2"].value == "correct F"
+        assert ws["E3"].value == "correct E2"
+        assert ws["F3"].value is None  # not "fallback text"
+        wb.close()
+
+    def test_write_xlsx_empty_per_col_no_fallback(self, tmp_path):
+        """per_col_answers={} の場合、answer_text にフォールバックしない."""
+        path = _make_xlsx_multi_col(tmp_path)
+        fc = FormatConfig(file_format="xlsx", question_col="D", answer_col="E",
+                          header_row=1, data_start_row=2)
+        col_defs = [
+            {"col": "D", "role": "question"},
+            {"col": "E", "role": "answer"},
+            {"col": "F", "role": "answer"},
+        ]
+        answers = {1: "AI proposal text", 2: "AI proposal text"}
+        per_col = {1: {}, 2: {}}  # 空 dict = 何も書かない
+        output = tmp_path / "out.xlsx"
+
+        write_answers_to_original(path, answers, fc, output,
+                                  column_definitions=col_defs, per_col_answers=per_col)
+
+        from openpyxl import load_workbook
+        wb = load_workbook(str(output))
+        ws = wb.active
+        assert ws["E2"].value is None  # NOT "AI proposal text"
+        assert ws["F2"].value is None
+        assert ws["E3"].value is None
+        assert ws["F3"].value is None
+        wb.close()
+
+    def test_write_xlsx_partial_col_texts(self, tmp_path):
+        """一部列のみにテキストがある場合、他列は None."""
+        path = _make_xlsx_multi_col(tmp_path)
+        fc = FormatConfig(file_format="xlsx", question_col="D", answer_col="E",
+                          header_row=1, data_start_row=2)
+        col_defs = [
+            {"col": "D", "role": "question"},
+            {"col": "E", "role": "answer"},
+            {"col": "F", "role": "answer"},
+        ]
+        answers = {1: "should not appear"}
+        per_col = {1: {"E": "only E"}}  # F のキーなし
+        output = tmp_path / "out.xlsx"
+
+        write_answers_to_original(path, answers, fc, output,
+                                  column_definitions=col_defs, per_col_answers=per_col)
+
+        from openpyxl import load_workbook
+        wb = load_workbook(str(output))
+        ws = wb.active
+        assert ws["E2"].value == "only E"
+        assert ws["F2"].value is None  # F は per_col_answers にないので None
+        wb.close()
+
+    def test_write_xlsx_legacy_uses_answers(self, tmp_path):
+        """レガシーモード(column_definitions なし)は従来通り answers dict を使用."""
+        path = _make_xlsx_questionnaire(tmp_path)
+        fc = FormatConfig(file_format="xlsx", question_col="D", answer_col="E",
+                          header_row=1, data_start_row=2)
+        answers = {1: "導入済み", 3: "適用済み"}
+        output = tmp_path / "out.xlsx"
+
+        # column_definitions=None → レガシーモード
+        write_answers_to_original(path, answers, fc, output)
+
+        from openpyxl import load_workbook
+        wb = load_workbook(str(output))
+        ws = wb.active
+        assert ws["E2"].value == "導入済み"
+        assert ws["E3"].value is None
+        assert ws["E4"].value == "適用済み"
+        wb.close()
+
+    def test_write_docx_no_fallback_with_col_defs(self, tmp_path):
+        """DOCX 版も column_definitions 使用時にフォールバックしない."""
+        path = _make_docx_questionnaire(tmp_path)
+        fc = FormatConfig(file_format="docx", question_col="D", answer_col="E",
+                          header_row=1, data_start_row=2, table_index=0)
+        col_defs = [
+            {"col": "D", "role": "question"},
+            {"col": "E", "role": "answer"},
+        ]
+        answers = {1: "fallback text", 2: "fallback text"}
+        per_col = {1: {"E": "correct text"}, 2: {}}  # Q2 は空
+        output = tmp_path / "out.docx"
+
+        write_answers_to_original(path, answers, fc, output,
+                                  column_definitions=col_defs, per_col_answers=per_col)
+
+        from docx import Document
+        doc = Document(str(output))
+        table = doc.tables[0]
+        assert table.rows[1].cells[4].text == "correct text"
+        assert table.rows[2].cells[4].text == ""  # NOT "fallback text"

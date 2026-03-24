@@ -451,28 +451,30 @@ def _write_xlsx_answers(
         # 回答列に書き込み（ハードゲート付き）
         mark = choices.get(no, "") if choices else ""
         col_texts = per_col_answers.get(no)
-        if col_texts or no in answers:
-            for i, a_col in enumerate(answer_cols):
-                cell = ws[f"{a_col}{row_idx}"]
-                if isinstance(cell, MergedCell):
-                    continue
-                # ハードゲート: 複数answer列 + 判定ありの場合、合わない列は必ず空
-                if len(answer_cols) >= 2 and mark:
-                    if mark in ("○", "◎") and i != 0:
-                        cell.value = None
+        if write_cols:
+            # column_definitions モード: per_col_answers のみ使用（answer_text フォールバックなし）
+            if col_texts is not None:
+                for i, a_col in enumerate(answer_cols):
+                    cell = ws[f"{a_col}{row_idx}"]
+                    if isinstance(cell, MergedCell):
                         continue
-                    if mark in ("△", "×") and i != 1:
-                        cell.value = None
-                        continue
-                # 列別テキストがあればそちらを優先
-                if col_texts:
+                    # ハードゲート: 複数answer列 + 判定ありの場合、合わない列は必ず空
+                    if len(answer_cols) >= 2 and mark:
+                        if mark in ("○", "◎") and i != 0:
+                            cell.value = None
+                            continue
+                        if mark in ("△", "×") and i != 1:
+                            cell.value = None
+                            continue
                     cell.value = col_texts.get(a_col) or None
-                elif no in answers:
-                    # △/×で列別テキストがない場合、代替策列はAIで書かない
-                    if len(answer_cols) >= 2 and mark in ("△", "×"):
-                        cell.value = None
-                    else:
-                        cell.value = answers[no]
+        else:
+            # レガシーモード: answers dict を使用
+            if no in answers:
+                for i, a_col in enumerate(answer_cols):
+                    cell = ws[f"{a_col}{row_idx}"]
+                    if isinstance(cell, MergedCell):
+                        continue
+                    cell.value = answers[no]
         # 判定列に書き込み
         if choices and no in choices:
             for j_col in judgment_cols:
@@ -539,27 +541,29 @@ def _write_docx_answers(
         # 回答列に書き込み（ハードゲート付き）
         mark = choices.get(no, "") if choices else ""
         col_texts = per_col_answers.get(no)
-        if col_texts or no in answers:
-            for j, a_idx in enumerate(answer_idxs):
-                if a_idx >= len(cells):
-                    continue
-                # ハードゲート: 複数answer列 + 判定ありの場合、合わない列は必ず空
-                if len(answer_idxs) >= 2 and mark:
-                    if mark in ("○", "◎") and j != 0:
-                        cells[a_idx].text = ""
+        if write_cols:
+            # column_definitions モード: per_col_answers のみ使用（answer_text フォールバックなし）
+            if col_texts is not None:
+                for j, a_idx in enumerate(answer_idxs):
+                    if a_idx >= len(cells):
                         continue
-                    if mark in ("△", "×") and j != 1:
-                        cells[a_idx].text = ""
+                    # ハードゲート: 複数answer列 + 判定ありの場合、合わない列は必ず空
+                    if len(answer_idxs) >= 2 and mark:
+                        if mark in ("○", "◎") and j != 0:
+                            cells[a_idx].text = ""
+                            continue
+                        if mark in ("△", "×") and j != 1:
+                            cells[a_idx].text = ""
+                            continue
+                    col_letter = answer_col_letters[j] if j < len(answer_col_letters) else ""
+                    cells[a_idx].text = (col_texts.get(col_letter) or "") if col_letter else ""
+        else:
+            # レガシーモード: answers dict を使用
+            if no in answers:
+                for j, a_idx in enumerate(answer_idxs):
+                    if a_idx >= len(cells):
                         continue
-                col_letter = answer_col_letters[j] if j < len(answer_col_letters) else ""
-                if col_texts and col_letter:
-                    cells[a_idx].text = col_texts.get(col_letter) or ""
-                elif no in answers:
-                    # △/×で列別テキストがない場合、代替策列はAIで書かない
-                    if len(answer_idxs) >= 2 and mark in ("△", "×"):
-                        cells[a_idx].text = ""
-                    else:
-                        cells[a_idx].text = answers[no]
+                    cells[a_idx].text = answers[no]
         if choices and no in choices:
             for j_idx in judgment_idxs:
                 if j_idx < len(cells):

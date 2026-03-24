@@ -883,8 +883,7 @@ def create_router(
                     texts = json.loads(texts)
                 except (ValueError, TypeError):
                     texts = {}
-            if texts:
-                per_col_answers[q["question_no"]] = texts
+            per_col_answers[q["question_no"]] = texts if texts else {}
 
         source_path = Path(session.get("source_file_path", ""))
         if source_path.exists():

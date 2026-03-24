@@ -234,7 +234,12 @@ def _run_session_pipeline_thread(
                         if judgment and judgment in ("○", "△", "×", "◎"):
                             updates["assessment_mark"] = judgment
                         # 列別テキストを構築（ハードゲート用）
-                        if len(answer_col_letters) >= 2 and judgment:
+                        # confidence が high 以外の場合は answer_texts を空にする
+                        # （answer_text は「AIからの提案」表示用に保持、エクスポートには含めない）
+                        conf = ans.get("confidence", "")
+                        if conf != "high":
+                            updates["answer_texts"] = json.dumps({}, ensure_ascii=False)
+                        elif len(answer_col_letters) >= 2 and judgment:
                             at = {}
                             if judgment in ("○", "◎"):
                                 at[answer_col_letters[0]] = ans["answer"]
@@ -267,11 +272,15 @@ def _run_session_pipeline_thread(
                 upd: dict = {"assessment_mark": mark}
                 q_data = q_map.get(q_no)
                 if q_data and len(answer_col_letters) >= 2:
-                    at = {}
-                    if mark in ("○", "◎"):
-                        at[answer_col_letters[0]] = q_data["answer_text"]
-                    # △/×の場合: 代替策はAIで書かない（ユーザがStep5で手動入力）
-                    upd["answer_texts"] = json.dumps(at, ensure_ascii=False)
+                    # confidence が high 以外はエクスポート対象外（answer_texts を空にする）
+                    if q_data.get("confidence") != "high":
+                        upd["answer_texts"] = json.dumps({}, ensure_ascii=False)
+                    else:
+                        at = {}
+                        if mark in ("○", "◎"):
+                            at[answer_col_letters[0]] = q_data["answer_text"]
+                        # △/×の場合: 代替策はAIで書かない（ユーザがStep5で手動入力）
+                        upd["answer_texts"] = json.dumps(at, ensure_ascii=False)
                 web_db.update_session_question(db_path, session_id, q_no, **upd)
             job.progress.append(f"判定完了: {len(marks)}件")
 

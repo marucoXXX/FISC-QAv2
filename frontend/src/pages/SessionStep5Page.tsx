@@ -104,7 +104,7 @@ export default function SessionStep5Page() {
 
       const initDrafts: Record<string, string> = {}
       for (const q of data.questions as SessionQuestion[]) {
-        const confident = q.answer_source !== "pending" && q.confidence !== "low"
+        const confident = q.answer_source !== "pending" && q.confidence === "high"
         const texts = q.answer_texts || {}
         if (hasMultiCols) {
           const mark = q.assessment_mark || ""
@@ -120,9 +120,14 @@ export default function SessionStep5Page() {
             }
           }
         } else {
-          // 単一列 or レガシー: question_no をキーに
+          // 単一列 or レガシー: answer_texts[col] を優先（ユーザ保存分を反映）
           const col = answerCols[0]?.col || "_"
-          initDrafts[`${q.question_no}_${col}`] = confident ? q.answer_text : ""
+          const key = `${q.question_no}_${col}`
+          if (col !== "_" && texts[col]) {
+            initDrafts[key] = texts[col]
+          } else {
+            initDrafts[key] = confident ? q.answer_text : ""
+          }
         }
       }
       setDrafts((prev) => {

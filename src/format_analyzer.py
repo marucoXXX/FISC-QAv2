@@ -421,6 +421,11 @@ _COLUMN_DEFS_SYSTEM_PROMPT = """\
 重要でない列（空列、繰り返しの結合セル等）は含めなくて構いません。
 必ず question と answer の役割を1つずつ含めてください。
 
+注意事項:
+- データ行の外側（ヘッダーより上、本体テーブルの右側/下側）に凡例テーブルや注釈がある場合、それらの列は answer や judgment に分類しないでください。
+- answer 列は通常1〜2列です。3列以上を answer に分類するのは稀です。
+- ヘッダーが2行にまたがる場合（結合セルのため）、両方の行を考慮して列の意味を判断してください。
+
 また、行の構造を自然言語で説明してください。
 この説明は、回答生成AIに「このアンケートの各行がどういう構造か」を伝えるために使います。
 
@@ -450,13 +455,26 @@ def _build_column_defs_prompt(
     col_letters = preview["col_letters"]
     lines = []
 
-    header = next((r for r in preview["rows"] if r["row_num"] == header_row), None)
-    if header:
-        parts = []
-        for i, val in enumerate(header["cells"]):
-            col = col_letters[i] if i < len(col_letters) else f"col{i}"
-            parts.append(f'{col}="{val if val else "(空)"}"')
-        lines.append(f"ヘッダー行（行{header_row}）: {' | '.join(parts)}")
+    # ヘッダー行（header_row〜data_start_row-1の全行を送信）
+    for h_row_num in range(header_row, data_start_row):
+        header = next((r for r in preview["rows"] if r["row_num"] == h_row_num), None)
+        if header:
+            parts = []
+            for i, val in enumerate(header["cells"]):
+                col = col_letters[i] if i < len(col_letters) else f"col{i}"
+                parts.append(f'{col}="{val if val else "(空)"}"')
+            lines.append(f"ヘッダー行（行{h_row_num}）: {' | '.join(parts)}")
+
+    # ヘッダーより上の行があれば凡例/メタデータとして送信
+    meta_rows = [r for r in preview["rows"] if r["row_num"] < header_row]
+    if meta_rows:
+        lines.append("\nヘッダーより上の行（メタデータ・凡例等。データ行ではありません）:")
+        for row_data in meta_rows[:3]:
+            parts = []
+            for i, val in enumerate(row_data["cells"]):
+                col = col_letters[i] if i < len(col_letters) else f"col{i}"
+                parts.append(f'{col}="{val if val else "(空)"}"')
+            lines.append(f"  行{row_data['row_num']}: {' | '.join(parts)}")
     lines.append("")
 
     data_rows = [r for r in preview["rows"] if r["row_num"] >= data_start_row][:5]
@@ -523,6 +541,18 @@ def analyze_columns(
 
     result.setdefault("row_structure", "")
     result.setdefault("heading_pattern", "")
+
+    # answer列数の上限バリデーション（3列以上は超過分を other に降格）
+    answer_count = sum(1 for d in result["column_definitions"] if d.get("role") == "answer")
+    if answer_count > 2:
+        logger.warning("LLM assigned %d answer columns, capping to 2", answer_count)
+        seen = 0
+        for d in result["column_definitions"]:
+            if d.get("role") == "answer":
+                seen += 1
+                if seen > 2:
+                    d["role"] = "other"
+
     return result
 
 
